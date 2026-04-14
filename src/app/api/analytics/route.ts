@@ -10,8 +10,15 @@ const AUTO_EVENTS = [
   'notification_receive', 'notification_dismiss', 'firebase_campaign',
 ];
 
+function parsePrivateKey(raw: string): string {
+  // Strip surrounding quotes that Vercel (or copy-paste) may add
+  const stripped = raw.trim().replace(/^["']|["']$/g, '');
+  // Convert literal \n sequences to real newlines
+  return stripped.replace(/\\n/g, '\n');
+}
+
 function buildClient() {
-  const privateKey = process.env.GA_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const privateKey = parsePrivateKey(process.env.GA_PRIVATE_KEY!);
   return new BetaAnalyticsDataClient({
     credentials: {
       client_email: process.env.GA_CLIENT_EMAIL,
@@ -37,9 +44,16 @@ function getDateRange(range: Range) {
 export async function GET(request: NextRequest) {
   const propertyId = process.env.GA_PROPERTY_ID;
 
-  if (!propertyId || !process.env.GA_CLIENT_EMAIL || !process.env.GA_PRIVATE_KEY) {
+  const missing = [
+    !propertyId && 'GA_PROPERTY_ID',
+    !process.env.GA_CLIENT_EMAIL && 'GA_CLIENT_EMAIL',
+    !process.env.GA_PRIVATE_KEY && 'GA_PRIVATE_KEY',
+  ].filter(Boolean);
+
+  if (missing.length > 0) {
+    console.error('[analytics/route] Missing env vars:', missing.join(', '));
     return NextResponse.json(
-      { error: 'Missing GA4 environment variables' },
+      { error: `Missing GA4 environment variables: ${missing.join(', ')}` },
       { status: 500 }
     );
   }
