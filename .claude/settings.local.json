@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /c/Users/User/Desktop/hovesh-plus-dashboard/src/app/api/analytics)",
+      "Bash(mkdir -p /c/Users/User/Desktop/hovesh-plus-dashboard/src/app/admin)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(echo \"EXIT:$?\")"
+    ]
+  }
+}
