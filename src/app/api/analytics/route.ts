@@ -80,15 +80,16 @@ export async function GET(request: NextRequest) {
       totalInstallsReport,
       platformReport,
       screenReport,
+      firstOpenReport,
     ] = await Promise.all([
-      // Summary: active users, sessions, new users, avg session duration
+      // Summary: active users, sessions, avg session duration
+      // (newUsers is taken from the explicit first_open query below)
       client.runReport({
         property,
         dateRanges: [dateRange],
         metrics: [
           { name: 'activeUsers' },
           { name: 'sessions' },
-          { name: 'newUsers' },
           { name: 'averageSessionDuration' },
         ],
       }),
@@ -120,18 +121,33 @@ export async function GET(request: NextRequest) {
         limit: 10,
       }),
 
-      // Geographic: top 10 cities
+      // Geographic: top 10 cities — filtered to Israel only to exclude
+      // irrelevant foreign-country data (e.g. Chicago, North Bergen).
       client.runReport({
         property,
         dateRanges: [dateRange],
         dimensions: [{ name: 'city' }],
         metrics: [{ name: 'activeUsers' }],
         dimensionFilter: {
-          notExpression: {
-            filter: {
-              fieldName: 'city',
-              inListFilter: { values: ['(not set)', 'not set', '(not provided)'] },
-            },
+          andGroup: {
+            expressions: [
+              {
+                // Only Israeli cities
+                filter: {
+                  fieldName: 'country',
+                  stringFilter: { matchType: 'EXACT', value: 'Israel' },
+                },
+              },
+              {
+                // Exclude unknown city values
+                notExpression: {
+                  filter: {
+                    fieldName: 'city',
+                    inListFilter: { values: ['(not set)', 'not set', '(not provided)'] },
+                  },
+                },
+              },
+            ],
           },
         },
         orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }],
@@ -196,6 +212,21 @@ export async function GET(request: NextRequest) {
         orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
         limit: 8,
       }),
+
+      // New users: explicitly count unique users who triggered first_open.
+      // This guarantees we count only genuine first installs and never
+      // double-count app restarts or repeated sessions.
+      client.runReport({
+        property,
+        dateRanges: [dateRange],
+        metrics: [{ name: 'activeUsers' }],
+        dimensionFilter: {
+          filter: {
+            fieldName: 'eventName',
+            stringFilter: { matchType: 'EXACT', value: 'first_open' },
+          },
+        },
+      }),
     ]);
 
     const [summaryRes] = summaryReport;
@@ -207,12 +238,14 @@ export async function GET(request: NextRequest) {
     const [totalInstallsRes] = totalInstallsReport;
     const [platformRes] = platformReport;
     const [screenRes] = screenReport;
+    const [firstOpenRes] = firstOpenReport;
 
     const summaryStats = {
       activeUsers: parseInt(summaryRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'),
       sessions: parseInt(summaryRes.rows?.[0]?.metricValues?.[1]?.value ?? '0'),
-      newUsers: parseInt(summaryRes.rows?.[0]?.metricValues?.[2]?.value ?? '0'),
-      avgSessionDuration: parseFloat(summaryRes.rows?.[0]?.metricValues?.[3]?.value ?? '0'),
+      // Use first_open-based count so we never include app restarts or repeat sessions
+      newUsers: parseInt(firstOpenRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'),
+      avgSessionDuration: parseFloat(summaryRes.rows?.[0]?.metricValues?.[2]?.value ?? '0'),
     };
 
     const chartData = (chartRes.rows ?? []).map((row) => {
@@ -239,14 +272,18 @@ export async function GET(request: NextRequest) {
       users: parseInt(row.metricValues?.[0]?.value ?? '0'),
     }));
 
-    const hourlyData = (hourlyRes.rows ?? []).map((row) => {
-      const h = row.dimensionValues?.[0]?.value ?? '0';
-      return {
-        hour: parseInt(h),
-        label: `${h.padStart(2, '0')}:00`,
-        sessions: parseInt(row.metricValues?.[0]?.value ?? '0'),
-      };
-    });
+    // GA4 returns hour dimension as a string — alphabetical sort ('0','1','10','11','2'...)
+    // so we sort numerically after mapping.
+    const hourlyData = (hourlyRes.rows ?? [])
+      .map((row) => {
+        const h = row.dimensionValues?.[0]?.value ?? '0';
+        return {
+          hour: parseInt(h, 10),
+          label: `${h.padStart(2, '0')}:00`,
+          sessions: parseInt(row.metricValues?.[0]?.value ?? '0'),
+        };
+      })
+      .sort((a, b) => a.hour - b.hour);
 
     const realtimeUsers = parseInt(
       realtimeRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'

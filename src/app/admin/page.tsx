@@ -148,7 +148,64 @@ const EVENT_LABELS: Record<string, string> = {
   vitals_recorded: 'רישום מדדים',
   burn_body_part_toggle: 'סימון חלקי גוף (כוויות)',
   sign_language_selected: 'בחירת שפת סימנים',
+  contact_translator: 'צור קשר עם מתרגם',
 };
+
+// Hebrew translations for Israeli city names returned by GA4
+const CITY_LABELS: Record<string, string> = {
+  'Tel Aviv': 'תל אביב-יפו',
+  'Tel Aviv-Yafo': 'תל אביב-יפו',
+  'Tel Aviv-Jaffa': 'תל אביב-יפו',
+  'Petah Tikva': 'פתח תקווה',
+  'Petah Tiqwa': 'פתח תקווה',
+  'Netanya': 'נתניה',
+  'Beit Shemesh': 'בית שמש',
+  'Jerusalem': 'ירושלים',
+  'Haifa': 'חיפה',
+  'Rishon LeZion': 'ראשון לציון',
+  'Rishon Leziyyon': 'ראשון לציון',
+  'Ashdod': 'אשדוד',
+  'Beer Sheva': 'באר שבע',
+  'Beersheba': 'באר שבע',
+  "Be'er Sheva": 'באר שבע',
+  'Ramat Gan': 'רמת גן',
+  'Holon': 'חולון',
+  'Bnei Brak': 'בני ברק',
+  'Rehovot': 'רחובות',
+  'Bat Yam': 'בת ים',
+  'Kfar Saba': 'כפר סבא',
+  'Herzliya': 'הרצליה',
+  'Modiin': 'מודיעין',
+  "Modi'in": 'מודיעין',
+  'Lod': 'לוד',
+  'Ramla': 'רמלה',
+  'Nazareth': 'נצרת',
+  'Nahariya': 'נהריה',
+  'Tiberias': 'טבריה',
+  'Eilat': 'אילת',
+  'Acre': 'עכו',
+  'Akko': 'עכו',
+  "Ra'anana": 'רעננה',
+  'Givatayim': 'גבעתיים',
+  'Kiryat Gat': 'קריית גת',
+  'Sderot': 'שדרות',
+  'Or Yehuda': 'אור יהודה',
+  'Yavne': 'יבנה',
+  'Ashkelon': 'אשקלון',
+  'Kiryat Ata': 'קריית אתא',
+  'Kiryat Bialik': 'קריית ביאליק',
+  'Kiryat Motzkin': 'קריית מוצקין',
+  'Kiryat Shmona': 'קריית שמונה',
+  'Kiryat Yam': 'קריית ים',
+  'Kiryat Ono': 'קריית אונו',
+  'Tzfat': 'צפת',
+  'Safed': 'צפת',
+  'Dimona': 'דימונה',
+};
+
+function hebrewCity(name: string) {
+  return CITY_LABELS[name] ?? name;
+}
 
 const PLATFORM_LABELS: Record<string, string> = {
   'iOS': 'iOS',
@@ -336,10 +393,13 @@ function RankedList({
               className="absolute inset-y-0 right-0 transition-all duration-500"
               style={{ width: `${pct}%`, background: accentColor, opacity: 0.12 }}
             />
-            <div className="relative flex items-center justify-between gap-3">
+            <div
+              className="relative flex items-center justify-between gap-3"
+              dir={itemDir}
+            >
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="text-xs font-bold text-white/30 w-4 shrink-0">{i + 1}</span>
-                <span className="text-sm font-medium text-white/80 break-words leading-snug" dir={itemDir}>{displayLabel}</span>
+                <span className="text-xs font-bold text-white/30 w-4 shrink-0 text-center">{i + 1}</span>
+                <span className="text-sm font-medium text-white/80 break-words leading-snug min-w-0">{displayLabel}</span>
               </div>
               <span className="text-sm font-bold shrink-0 tabular-nums" style={{ color: accentColor }}>
                 {displayValue}
@@ -359,7 +419,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [range, setRange] = useState<Range>('24h');
+  const [range, setRange] = useState<Range>('30min');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -393,7 +453,7 @@ export default function AdminDashboard() {
   const chartSub =
     data?.chartType === 'hourly' ? 'שעות 00:00 – 23:00' : rangeSubLabel(range);
 
-  const cityItems = (data?.cityData ?? []).map((c) => ({ id: c.city, label: c.city, value: c.users }));
+  const cityItems = (data?.cityData ?? []).map((c) => ({ id: c.city, label: hebrewCity(c.city), value: c.users }));
   const featureItems = (data?.featureEvents ?? []).map((e) => ({ id: e.name, label: e.name, value: e.count }));
   const platformItems = (data?.platformData ?? []).map((p) => ({ id: p.platform, label: p.platform, value: p.users }));
   const screenItems = (data?.screenData ?? []).map((s) => ({ id: s.screen, label: s.screen, value: s.views }));
@@ -442,13 +502,13 @@ export default function AdminDashboard() {
           </div>
 
           {/* ── Time Range Picker ── */}
-          <div className="mt-5 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="mt-5 grid grid-cols-4 gap-2">
             {RANGES.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setRange(key)}
                 className={`
-                  shrink-0 rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200
+                  rounded-xl px-2 py-2 text-sm font-semibold transition-all duration-200 text-center w-full
                   ${range === key
                     ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.4)]'
                     : 'border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
