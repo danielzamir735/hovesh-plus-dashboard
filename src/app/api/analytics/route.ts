@@ -236,17 +236,11 @@ export async function GET(request: NextRequest) {
         limit: 8,
       }),
 
-      // 10. New users via first_open
+      // 10. New users in selected date range
       client.runReport({
         property,
         dateRanges: [dateRange],
-        metrics: [{ name: 'activeUsers' }],
-        dimensionFilter: {
-          filter: {
-            fieldName: 'eventName',
-            stringFilter: { matchType: 'EXACT', value: 'first_open' },
-          },
-        },
+        metrics: [{ name: 'newUsers' }],
       }),
 
       // 11. Realtime feature_interaction by feature_name
