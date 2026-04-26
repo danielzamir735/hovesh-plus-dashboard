@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, animate } from 'framer-motion';
 import {
   Users,
   Activity,
@@ -16,6 +16,11 @@ import {
   Download,
   Smartphone,
   Monitor,
+  Calculator,
+  Stethoscope,
+  Wrench,
+  AlertTriangle,
+  ExternalLink,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -71,6 +76,11 @@ interface ScreenPoint {
   views: number;
 }
 
+interface RealtimeInteractions {
+  byCategory: Record<string, number>;
+  byFeature: Array<{ name: string; count: number }>;
+}
+
 interface AnalyticsData {
   summaryStats: SummaryStats;
   chartData: ChartPoint[];
@@ -82,6 +92,7 @@ interface AnalyticsData {
   totalInstalls: number;
   platformData: PlatformPoint[];
   screenData: ScreenPoint[];
+  realtimeInteractions: RealtimeInteractions;
 }
 
 const RANGES = [
@@ -114,6 +125,19 @@ function rangeSubLabel(range: Range): string {
   }
 }
 
+// ─── Translation maps ─────────────────────────────────────────────────────────
+
+// Critical mapping: feature_name GA4 parameter → Hebrew display names
+const FEATURE_NAME_LABELS: Record<string, string> = {
+  'whatsapp-community': 'קהילת חובש +',
+  'kit-standards': 'תקנים לתיקי כונן',
+  'realtime-translate': 'תרגום רפואי',
+  'medication-scanner': 'מידע על תרופות',
+  burn_calculator: 'מחשבון כוויות',
+  hospitals: 'מידע בתי חולים',
+  simulators: 'סימולטורים ללמידה',
+};
+
 const EVENT_LABELS: Record<string, string> = {
   calculator_open: 'פתיחת מחשבון',
   calculator_use: 'שימוש במחשבון',
@@ -138,7 +162,6 @@ const EVENT_LABELS: Record<string, string> = {
   view_item_list: 'צפייה ברשימה',
   begin_checkout: 'התחלת תשלום',
   generate_lead: 'יצירת ליד',
-  // חובש+ specific features
   feature_interaction: 'אינטראקציה עם פיצ\'ר',
   modal_view: 'צפייה בחלונית',
   language_select: 'בחירת שפה',
@@ -151,7 +174,6 @@ const EVENT_LABELS: Record<string, string> = {
   contact_translator: 'צור קשר עם מתרגם',
 };
 
-// Hebrew translations for Israeli city names returned by GA4
 const CITY_LABELS: Record<string, string> = {
   'Tel Aviv': 'תל אביב-יפו',
   'Tel Aviv-Yafo': 'תל אביב-יפו',
@@ -217,15 +239,49 @@ const PLATFORM_LABELS: Record<string, string> = {
   'web': 'ווב',
 };
 
+// Checks FEATURE_NAME_LABELS first, then generic EVENT_LABELS
 function hebrewEvent(name: string) {
+  if (FEATURE_NAME_LABELS[name]) return FEATURE_NAME_LABELS[name];
   if (EVENT_LABELS[name]) return EVENT_LABELS[name];
-  const readable = name.replace(/_/g, ' ');
-  return readable.charAt(0).toUpperCase() + readable.slice(1);
+  return name.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function hebrewPlatform(name: string) {
   return PLATFORM_LABELS[name] ?? name;
 }
+
+// ─── Category config for realtime interactions ─────────────────────────────────
+
+const CATEGORIES = [
+  {
+    key: 'calculators',
+    label: 'מחשבונים',
+    icon: Calculator,
+    color: '#f97316',
+    bg: 'bg-orange-500/20',
+  },
+  {
+    key: 'medical_knowledge',
+    label: 'ידע רפואי',
+    icon: Stethoscope,
+    color: '#06b6d4',
+    bg: 'bg-cyan-500/20',
+  },
+  {
+    key: 'tools',
+    label: 'כלים',
+    icon: Wrench,
+    color: '#a855f7',
+    bg: 'bg-purple-500/20',
+  },
+  {
+    key: 'emergency_info',
+    label: 'מידע חירום',
+    icon: AlertTriangle,
+    color: '#ef4444',
+    bg: 'bg-red-500/20',
+  },
+] as const;
 
 // ─── Animation variants ───────────────────────────────────────────────────────
 
@@ -246,16 +302,41 @@ const fadeIn = {
   }),
 };
 
+// ─── AnimatedNumber ───────────────────────────────────────────────────────────
+
+function AnimatedNumber({
+  value,
+  format: fmt = formatNumber,
+}: {
+  value: number;
+  format?: (n: number) => string;
+}) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    const ctrl = animate(0, value, {
+      duration: 1.4,
+      ease: 'easeOut',
+      onUpdate: (v) => setDisplay(Math.round(v)),
+    });
+    return () => ctrl.stop();
+  }, [value]);
+
+  return <span className="tabular-nums">{fmt(display)}</span>;
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function GlassCard({
   children,
   className = '',
   index = 0,
+  neonColor,
 }: {
   children: React.ReactNode;
   className?: string;
   index?: number;
+  neonColor?: string;
 }) {
   return (
     <motion.div
@@ -263,7 +344,18 @@ function GlassCard({
       variants={fadeUp}
       initial="hidden"
       animate="visible"
-      className={`rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] ${className}`}
+      className={`rounded-2xl border bg-white/5 backdrop-blur-xl ${className}`}
+      style={
+        neonColor
+          ? {
+              borderColor: neonColor,
+              boxShadow: `0 0 24px ${neonColor}, 0 8px 32px rgba(0,0,0,0.4)`,
+            }
+          : {
+              borderColor: 'rgba(255,255,255,0.10)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+            }
+      }
     >
       {children}
     </motion.div>
@@ -273,22 +365,29 @@ function GlassCard({
 function StatCard({
   icon: Icon,
   label,
-  value,
+  rawValue,
+  rawFormat,
+  staticValue,
   sub,
   accent,
   index,
+  neonColor,
 }: {
   icon: React.ElementType;
   label: string;
-  value: string | number;
+  rawValue?: number;
+  rawFormat?: (n: number) => string;
+  staticValue?: string;
   sub?: string;
   accent: string;
   index: number;
+  neonColor?: string;
 }) {
   return (
     <GlassCard
       index={index}
       className="p-5 flex flex-col gap-3 hover:bg-white/10 transition-colors duration-300"
+      neonColor={neonColor}
     >
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-white/60 leading-tight">{label}</span>
@@ -296,7 +395,13 @@ function StatCard({
           <Icon size={16} className="text-white" />
         </div>
       </div>
-      <p className="text-3xl font-bold tracking-tight text-white">{value}</p>
+      <p className="text-3xl font-bold tracking-tight text-white">
+        {rawValue !== undefined ? (
+          <AnimatedNumber value={rawValue} format={rawFormat} />
+        ) : (
+          staticValue ?? '—'
+        )}
+      </p>
       {sub && <p className="text-xs text-white/40 leading-tight">{sub}</p>}
     </GlassCard>
   );
@@ -310,7 +415,8 @@ function AreaTooltip({ active, payload, label }: any) {
       <p className="font-semibold text-white/80 mb-1.5">{label}</p>
       {payload.map((p: { name: string; value: number; color: string }, i: number) => (
         <p key={i} style={{ color: p.color }} className="leading-relaxed">
-          {p.name === 'sessions' ? 'סשנים' : 'משתמשים'}: <span className="font-bold">{formatNumber(p.value)}</span>
+          {p.name === 'sessions' ? 'סשנים' : 'משתמשים'}:{' '}
+          <span className="font-bold">{formatNumber(p.value)}</span>
         </p>
       ))}
     </div>
@@ -374,41 +480,158 @@ function RankedList({
     return <p className="text-sm text-white/30 text-center py-8">{emptyText}</p>;
   }
   return (
-    <ol className="flex flex-col gap-2 overflow-y-auto max-h-64 xl:max-h-none">
-      {items.map((item, i) => {
-        const pct = Math.round((item.value / maxValue) * 100);
-        const displayLabel = labelFn ? labelFn(item.label) : item.label;
-        const displayValue = valueFn ? valueFn(item.value) : formatNumber(item.value);
-        return (
-          <motion.li
-            key={item.id}
-            custom={i}
-            variants={fadeIn}
-            initial="hidden"
-            animate="visible"
-            className="group relative rounded-xl border border-white/5 bg-white/5 px-4 py-3 overflow-hidden hover:bg-white/10 transition-all duration-300"
-            style={{ ['--hover-border' as string]: accentColor }}
-          >
-            <div
-              className="absolute inset-y-0 right-0 transition-all duration-500"
-              style={{ width: `${pct}%`, background: accentColor, opacity: 0.12 }}
-            />
-            <div
-              className="relative flex items-center justify-between gap-3"
-              dir={itemDir}
+    <AnimatePresence mode="popLayout">
+      <ol className="flex flex-col gap-2 overflow-y-auto max-h-80 pr-0.5">
+        {items.map((item, i) => {
+          const pct = Math.round((item.value / maxValue) * 100);
+          const displayLabel = labelFn ? labelFn(item.label) : item.label;
+          const displayValue = valueFn ? valueFn(item.value) : formatNumber(item.value);
+          return (
+            <motion.li
+              key={item.id}
+              custom={i}
+              variants={fadeIn}
+              initial="hidden"
+              animate="visible"
+              exit={{ opacity: 0, y: -4 }}
+              className="group relative rounded-xl border border-white/5 bg-white/5 px-4 py-3 overflow-hidden hover:bg-white/10 transition-all duration-300"
             >
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="text-xs font-bold text-white/30 w-4 shrink-0 text-center">{i + 1}</span>
-                <span className="text-sm font-medium text-white/80 break-words leading-snug min-w-0">{displayLabel}</span>
+              <div
+                className="absolute inset-y-0 right-0 transition-all duration-500"
+                style={{ width: `${pct}%`, background: accentColor, opacity: 0.12 }}
+              />
+              <div
+                className="relative flex items-center justify-between gap-3"
+                dir={itemDir}
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-xs font-bold text-white/30 w-4 shrink-0 text-center">
+                    {i + 1}
+                  </span>
+                  <span className="text-sm font-medium text-white/80 break-words leading-snug min-w-0">
+                    {displayLabel}
+                  </span>
+                </div>
+                <span
+                  className="text-sm font-bold shrink-0 tabular-nums"
+                  style={{ color: accentColor }}
+                >
+                  {displayValue}
+                </span>
               </div>
-              <span className="text-sm font-bold shrink-0 tabular-nums" style={{ color: accentColor }}>
-                {displayValue}
-              </span>
-            </div>
-          </motion.li>
-        );
-      })}
-    </ol>
+            </motion.li>
+          );
+        })}
+      </ol>
+    </AnimatePresence>
+  );
+}
+
+// ─── Realtime Category Widget ──────────────────────────────────────────────────
+
+function RealtimeCategoryWidget({
+  data,
+  loading,
+}: {
+  data: AnalyticsData | null;
+  loading: boolean;
+}) {
+  const interactions = data?.realtimeInteractions;
+  const total = Object.values(interactions?.byCategory ?? {}).reduce((a, b) => a + b, 0);
+
+  return (
+    <GlassCard index={12} className="p-6">
+      <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-indigo-500/20">
+            <Activity size={18} className="text-indigo-400" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-white">אינטראקציות בזמן אמת</h2>
+            <p className="text-xs text-white/40">30 דקות אחרונות · לפי קטגוריה</p>
+          </div>
+        </div>
+        {!loading && (
+          <div className="text-left">
+            <p className="text-xs text-white/30">סה&quot;כ</p>
+            <p className="text-xl font-bold text-white">
+              <AnimatedNumber value={total} />
+            </p>
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 animate-pulse rounded-xl bg-white/5" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {CATEGORIES.map(({ key, label, icon: Icon, color, bg }, i) => {
+            const count = interactions?.byCategory?.[key] ?? 0;
+            const active = count > 0;
+            return (
+              <motion.div
+                key={key}
+                custom={i}
+                variants={fadeUp}
+                initial="hidden"
+                animate="visible"
+                className="rounded-xl border p-4 flex flex-col items-center gap-2 text-center transition-all duration-500"
+                style={{
+                  borderColor: active ? `${color}50` : 'rgba(255,255,255,0.08)',
+                  background: active ? `${color}0d` : 'rgba(255,255,255,0.03)',
+                  boxShadow: active ? `0 0 20px ${color}28` : undefined,
+                }}
+              >
+                <div className={`p-2.5 rounded-xl ${bg}`}>
+                  <Icon size={20} style={{ color }} />
+                </div>
+                <p
+                  className="text-2xl font-bold"
+                  style={{ color: active ? color : 'rgba(255,255,255,0.25)' }}
+                >
+                  <AnimatedNumber value={count} />
+                </p>
+                <p className="text-xs text-white/50 leading-tight">{label}</p>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Feature-level breakdown (visible when data is available) */}
+      {!loading && (interactions?.byFeature ?? []).length > 0 && (
+        <div className="mt-5 pt-4 border-t border-white/5">
+          <p className="text-xs text-white/30 mb-3">פירוט לפי פיצ&apos;ר:</p>
+          <AnimatePresence mode="popLayout">
+            {interactions!.byFeature.map((f, i) => (
+              <motion.div
+                key={f.name}
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ delay: i * 0.04, duration: 0.3 }}
+                className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0"
+              >
+                <span className="text-sm text-white/70">{hebrewEvent(f.name)}</span>
+                <span className="text-sm font-bold text-white/50 tabular-nums">
+                  {formatNumber(f.count)}
+                </span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {!loading && (interactions?.byFeature ?? []).length === 0 && (
+        <p className="mt-4 text-sm text-white/25 text-center">
+          אין אינטראקציות בחצי שעה האחרונה
+        </p>
+      )}
+    </GlassCard>
   );
 }
 
@@ -431,7 +654,13 @@ export default function AdminDashboard() {
         throw new Error(body.error ?? `שגיאת שרת: ${res.status}`);
       }
       const json: AnalyticsData = await res.json();
-      setData(json);
+      setData({
+        ...json,
+        realtimeInteractions: json.realtimeInteractions ?? {
+          byCategory: { calculators: 0, medical_knowledge: 0, tools: 0, emergency_info: 0 },
+          byFeature: [],
+        },
+      });
       setLastUpdated(new Date());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה לא ידועה');
@@ -453,10 +682,26 @@ export default function AdminDashboard() {
   const chartSub =
     data?.chartType === 'hourly' ? 'שעות 00:00 – 23:00' : rangeSubLabel(range);
 
-  const cityItems = (data?.cityData ?? []).map((c) => ({ id: c.city, label: hebrewCity(c.city), value: c.users }));
-  const featureItems = (data?.featureEvents ?? []).map((e) => ({ id: e.name, label: e.name, value: e.count }));
-  const platformItems = (data?.platformData ?? []).map((p) => ({ id: p.platform, label: p.platform, value: p.users }));
-  const screenItems = (data?.screenData ?? []).map((s) => ({ id: s.screen, label: s.screen, value: s.views }));
+  const cityItems = (data?.cityData ?? []).map((c) => ({
+    id: c.city,
+    label: hebrewCity(c.city),
+    value: c.users,
+  }));
+  const featureItems = (data?.featureEvents ?? []).map((e) => ({
+    id: e.name,
+    label: e.name,
+    value: e.count,
+  }));
+  const platformItems = (data?.platformData ?? []).map((p) => ({
+    id: p.platform,
+    label: p.platform,
+    value: p.users,
+  }));
+  const screenItems = (data?.screenData ?? []).map((s) => ({
+    id: s.screen,
+    label: s.screen,
+    value: s.views,
+  }));
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#06071a] text-white">
@@ -490,6 +735,15 @@ export default function AdminDashboard() {
                   עודכן: {lastUpdated.toLocaleTimeString('he-IL')}
                 </span>
               )}
+              <a
+                href="https://docs.google.com/spreadsheets/d/1DiNuIOnOhrMU1GVbPrCd5s2XcIRvPnvIpfiyQnouS28/edit?resourcekey=&gid=893573067#gid=893573067"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-xl border border-indigo-400/40 bg-indigo-500/15 px-4 py-2 text-sm font-semibold text-indigo-300 backdrop-blur-md transition-all hover:bg-indigo-500/25 hover:text-indigo-200 shadow-[0_0_16px_rgba(99,102,241,0.25)]"
+              >
+                <ExternalLink size={14} />
+                ערוץ
+              </a>
               <button
                 onClick={fetchData}
                 disabled={loading}
@@ -546,7 +800,7 @@ export default function AdminDashboard() {
                 index={0}
                 icon={Users}
                 label="משתמשים פעילים"
-                value={formatNumber(data?.summaryStats.activeUsers ?? 0)}
+                rawValue={data?.summaryStats.activeUsers ?? 0}
                 sub={rangeSubLabel(range)}
                 accent="bg-indigo-500/30"
               />
@@ -554,15 +808,16 @@ export default function AdminDashboard() {
                 index={1}
                 icon={Activity}
                 label="פעילים עכשיו"
-                value={formatNumber(data?.realtimeUsers ?? 0)}
+                rawValue={data?.realtimeUsers ?? 0}
                 sub="30 דקות אחרונות"
                 accent="bg-emerald-500/30"
+                neonColor="rgba(16,185,129,0.35)"
               />
               <StatCard
                 index={2}
                 icon={TrendingUp}
                 label="סשנים"
-                value={formatNumber(data?.summaryStats.sessions ?? 0)}
+                rawValue={data?.summaryStats.sessions ?? 0}
                 sub={rangeSubLabel(range)}
                 accent="bg-violet-500/30"
               />
@@ -570,15 +825,17 @@ export default function AdminDashboard() {
                 index={3}
                 icon={UserPlus}
                 label="משתמשים חדשים"
-                value={formatNumber(data?.summaryStats.newUsers ?? 0)}
-                sub={rangeSubLabel(range)}
+                rawValue={data?.summaryStats.newUsers ?? 0}
+                sub="מכשירים/דפדפנים חדשים"
                 accent="bg-sky-500/30"
+                neonColor="rgba(14,165,233,0.35)"
               />
               <StatCard
                 index={4}
                 icon={Clock}
                 label="זמן שהייה ממוצע"
-                value={formatDuration(data?.summaryStats.avgSessionDuration ?? 0)}
+                rawValue={data?.summaryStats.avgSessionDuration ?? 0}
+                rawFormat={formatDuration}
                 sub="דקות:שניות לסשן"
                 accent="bg-amber-500/30"
               />
@@ -586,13 +843,18 @@ export default function AdminDashboard() {
                 index={5}
                 icon={Download}
                 label="סה״כ התקנות"
-                value={formatNumber(data?.totalInstalls ?? 0)}
+                rawValue={data?.totalInstalls ?? 0}
                 sub="מאז תחילת האפליקציה"
                 accent="bg-rose-500/30"
               />
             </>
           )}
         </section>
+
+        {/* ── Realtime Category Widget ── */}
+        <div className="mb-6">
+          <RealtimeCategoryWidget data={data} loading={loading} />
+        </div>
 
         {/* ── Main chart + Feature events ── */}
         <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -735,7 +997,10 @@ export default function AdminDashboard() {
                     tickLine={false}
                     axisLine={false}
                   />
-                  <Tooltip content={<BarTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                  <Tooltip
+                    content={<BarTooltip />}
+                    cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  />
                   <Bar dataKey="sessions" radius={[4, 4, 0, 0]}>
                     {(data?.hourlyData ?? []).map((entry) => {
                       const intensity = entry.sessions / maxHourlySessions;
@@ -753,7 +1018,7 @@ export default function AdminDashboard() {
             )}
           </GlassCard>
 
-          {/* Geographic: top cities */}
+          {/* Geographic: cities — scrollable table showing all 25 cities */}
           <GlassCard index={9} className="p-6 flex flex-col">
             <div className="mb-5 flex items-center gap-3">
               <div className="p-2 rounded-xl bg-emerald-500/20">

@@ -1,7 +1,6 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Automatic GA4 events that are not feature-specific
 const AUTO_EVENTS = [
   'page_view', 'scroll', 'session_start', 'first_visit',
   'user_engagement', 'click', 'file_download', 'video_start',
@@ -10,10 +9,19 @@ const AUTO_EVENTS = [
   'notification_receive', 'notification_dismiss', 'firebase_campaign',
 ];
 
+// Maps feature_name event parameter → category bucket
+const FEATURE_CATEGORY_MAP: Record<string, string> = {
+  burn_calculator: 'calculators',
+  'medication-scanner': 'medical_knowledge',
+  'realtime-translate': 'medical_knowledge',
+  hospitals: 'medical_knowledge',
+  'kit-standards': 'medical_knowledge',
+  'whatsapp-community': 'tools',
+  simulators: 'tools',
+};
+
 function parsePrivateKey(raw: string): string {
-  // Strip surrounding quotes that Vercel (or copy-paste) may add
   const stripped = raw.trim().replace(/^["']|["']$/g, '');
-  // Convert literal \n sequences to real newlines
   return stripped.replace(/\\n/g, '\n');
 }
 
@@ -40,6 +48,9 @@ function getDateRange(range: Range) {
       return { startDate: '30daysAgo', endDate: 'today' };
   }
 }
+
+// Safe fallback shape for a failed realtime report
+const EMPTY_RT_REPORT = [{ rows: [] as { dimensionValues?: { value?: string }[]; metricValues?: { value?: string }[] }[] }] as const;
 
 export async function GET(request: NextRequest) {
   const propertyId = process.env.GA_PROPERTY_ID;
@@ -81,9 +92,9 @@ export async function GET(request: NextRequest) {
       platformReport,
       screenReport,
       firstOpenReport,
+      realtimeFeaturesReport,
     ] = await Promise.all([
-      // Summary: active users, sessions, avg session duration
-      // (newUsers is taken from the explicit first_open query below)
+      // 1. Summary: active users, sessions, avg duration
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -94,7 +105,7 @@ export async function GET(request: NextRequest) {
         ],
       }),
 
-      // Chart: hourly (today) for 24h/30min, daily for 7d/30d
+      // 2. Chart: hourly or daily
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -103,7 +114,7 @@ export async function GET(request: NextRequest) {
         orderBys: [{ dimension: { dimensionName: useHourly ? 'hour' : 'date' } }],
       }),
 
-      // Feature events: filtered, no automatic events, top 10
+      // 3. Feature events: top 10 custom events (auto events excluded)
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -121,8 +132,7 @@ export async function GET(request: NextRequest) {
         limit: 10,
       }),
 
-      // Geographic: top 10 cities — filtered to Israel only to exclude
-      // irrelevant foreign-country data (e.g. Chicago, North Bergen).
+      // 4. Cities: top 25 Israeli cities (increased from 10 so list is not cut off)
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -132,14 +142,12 @@ export async function GET(request: NextRequest) {
           andGroup: {
             expressions: [
               {
-                // Only Israeli cities
                 filter: {
                   fieldName: 'country',
                   stringFilter: { matchType: 'EXACT', value: 'Israel' },
                 },
               },
               {
-                // Exclude unknown city values
                 notExpression: {
                   filter: {
                     fieldName: 'city',
@@ -151,10 +159,10 @@ export async function GET(request: NextRequest) {
           },
         },
         orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }],
-        limit: 10,
+        limit: 25,
       }),
 
-      // Peak hours: hourly aggregation over the range (0-23)
+      // 5. Peak hours: hourly aggregation 0-23
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -163,21 +171,21 @@ export async function GET(request: NextRequest) {
         orderBys: [{ dimension: { dimensionName: 'hour' } }],
       }),
 
-      // Realtime: active users in last 30 minutes
+      // 6. Realtime: active users last 30 min
       client.runRealtimeReport({
         property,
         metrics: [{ name: 'activeUsers' }],
         minuteRanges: [{ name: 'last30min', startMinutesAgo: 29, endMinutesAgo: 0 }],
       }),
 
-      // Total installs (all-time new users = cumulative installs proxy)
+      // 7. Total installs (all-time cumulative)
       client.runReport({
         property,
         dateRanges: [{ startDate: '2023-01-01', endDate: 'today' }],
         metrics: [{ name: 'newUsers' }],
       }),
 
-      // Platform / OS breakdown
+      // 8. Platform / OS breakdown
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -195,7 +203,7 @@ export async function GET(request: NextRequest) {
         limit: 6,
       }),
 
-      // Top screens / pages
+      // 9. Top screens
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -213,9 +221,7 @@ export async function GET(request: NextRequest) {
         limit: 8,
       }),
 
-      // New users: explicitly count unique users who triggered first_open.
-      // This guarantees we count only genuine first installs and never
-      // double-count app restarts or repeated sessions.
+      // 10. New users via first_open to avoid counting restarts
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -227,6 +233,22 @@ export async function GET(request: NextRequest) {
           },
         },
       }),
+
+      // 11. Realtime feature_interaction events by feature_name (last 30 min)
+      // Uses customEvent:feature_name — requires the dimension to be registered in GA4.
+      // Falls back to empty rows if the dimension is unavailable.
+      client.runRealtimeReport({
+        property,
+        dimensions: [{ name: 'customEvent:feature_name' }],
+        metrics: [{ name: 'eventCount' }],
+        dimensionFilter: {
+          filter: {
+            fieldName: 'eventName',
+            stringFilter: { matchType: 'EXACT', value: 'feature_interaction' },
+          },
+        },
+        minuteRanges: [{ name: 'last30min', startMinutesAgo: 29, endMinutesAgo: 0 }],
+      }).catch(() => EMPTY_RT_REPORT),
     ]);
 
     const [summaryRes] = summaryReport;
@@ -239,11 +261,11 @@ export async function GET(request: NextRequest) {
     const [platformRes] = platformReport;
     const [screenRes] = screenReport;
     const [firstOpenRes] = firstOpenReport;
+    const [realtimeFeaturesRes] = realtimeFeaturesReport;
 
     const summaryStats = {
       activeUsers: parseInt(summaryRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'),
       sessions: parseInt(summaryRes.rows?.[0]?.metricValues?.[1]?.value ?? '0'),
-      // Use first_open-based count so we never include app restarts or repeat sessions
       newUsers: parseInt(firstOpenRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'),
       avgSessionDuration: parseFloat(summaryRes.rows?.[0]?.metricValues?.[2]?.value ?? '0'),
     };
@@ -272,8 +294,7 @@ export async function GET(request: NextRequest) {
       users: parseInt(row.metricValues?.[0]?.value ?? '0'),
     }));
 
-    // GA4 returns hour dimension as a string — alphabetical sort ('0','1','10','11','2'...)
-    // so we sort numerically after mapping.
+    // GA4 returns hour as string with alphabetical ordering — sort numerically after mapping
     const hourlyData = (hourlyRes.rows ?? [])
       .map((row) => {
         const h = row.dimensionValues?.[0]?.value ?? '0';
@@ -303,6 +324,25 @@ export async function GET(request: NextRequest) {
       views: parseInt(row.metricValues?.[0]?.value ?? '0'),
     }));
 
+    // Aggregate realtime feature interactions into category buckets
+    const byCategory: Record<string, number> = {
+      calculators: 0,
+      medical_knowledge: 0,
+      tools: 0,
+      emergency_info: 0,
+    };
+    const byFeature: { name: string; count: number }[] = [];
+
+    for (const row of realtimeFeaturesRes.rows ?? []) {
+      const featureName = row.dimensionValues?.[0]?.value ?? '';
+      const count = parseInt(row.metricValues?.[0]?.value ?? '0');
+      if (!featureName || featureName === '(not set)') continue;
+      const category = FEATURE_CATEGORY_MAP[featureName] ?? 'tools';
+      byCategory[category] = (byCategory[category] ?? 0) + count;
+      byFeature.push({ name: featureName, count });
+    }
+    byFeature.sort((a, b) => b.count - a.count);
+
     return NextResponse.json(
       {
         summaryStats,
@@ -315,6 +355,7 @@ export async function GET(request: NextRequest) {
         totalInstalls,
         platformData,
         screenData,
+        realtimeInteractions: { byCategory, byFeature },
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );
