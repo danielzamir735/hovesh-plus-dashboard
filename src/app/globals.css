@@ -1,35 +1,136 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #020617;
+  --foreground: #f1f5f9;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-heebo), var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans, 'Heebo', Arial, sans-serif);
 }
 
 html {
   scroll-behavior: smooth;
 }
 
-/* Hebrew-friendly number rendering */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* ─── Custom scrollbar ────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* ─── Shimmer skeleton ────────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0%   { background-position: -400% 0; }
+  100% { background-position:  400% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.03) 75%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* ─── Neon pulse (intensity-driven via --neon CSS var) ────────────────────── */
+
+@keyframes neon-pulse-low {
+  0%, 100% {
+    box-shadow:
+      0 0 10px var(--neon),
+      0 0 20px color-mix(in srgb, var(--neon) 25%, transparent),
+      inset 0 0 6px color-mix(in srgb, var(--neon) 10%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 18px var(--neon),
+      0 0 36px color-mix(in srgb, var(--neon) 18%, transparent),
+      inset 0 0 10px color-mix(in srgb, var(--neon) 15%, transparent);
+  }
+}
+
+@keyframes neon-pulse-mid {
+  0%, 100% {
+    box-shadow:
+      0 0 16px var(--neon),
+      0 0 32px color-mix(in srgb, var(--neon) 35%, transparent),
+      inset 0 0 8px color-mix(in srgb, var(--neon) 12%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 28px var(--neon),
+      0 0 56px color-mix(in srgb, var(--neon) 25%, transparent),
+      inset 0 0 14px color-mix(in srgb, var(--neon) 20%, transparent);
+  }
+}
+
+@keyframes neon-pulse-high {
+  0%, 100% {
+    box-shadow:
+      0 0 24px var(--neon),
+      0 0 48px color-mix(in srgb, var(--neon) 45%, transparent),
+      inset 0 0 10px color-mix(in srgb, var(--neon) 15%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 40px var(--neon),
+      0 0 80px color-mix(in srgb, var(--neon) 32%, transparent),
+      inset 0 0 18px color-mix(in srgb, var(--neon) 24%, transparent);
+  }
+}
+
+.neon-low  { animation: neon-pulse-low  2.8s ease-in-out infinite; }
+.neon-mid  { animation: neon-pulse-mid  2.4s ease-in-out infinite; }
+.neon-high { animation: neon-pulse-high 2.0s ease-in-out infinite; }
+
+/* ─── Live dot pulse ──────────────────────────────────────────────────────── */
+
+@keyframes dot-pulse {
+  0%, 100% { transform: scale(1);   opacity: 1;   }
+  50%       { transform: scale(1.5); opacity: 0.5; }
+}
+
+.live-dot {
+  animation: dot-pulse 1.4s ease-in-out infinite;
+}
+
+/* ─── Outer ring pulse on live dot container ──────────────────────────────── */
+
+@keyframes ring-pulse {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  100% { transform: scale(2.2); opacity: 0;   }
+}
+
+.live-ring {
+  animation: ring-pulse 1.4s ease-out infinite;
 }

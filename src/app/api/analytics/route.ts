@@ -9,7 +9,6 @@ const AUTO_EVENTS = [
   'notification_receive', 'notification_dismiss', 'firebase_campaign',
 ];
 
-// Maps feature_name event parameter → category bucket
 const FEATURE_CATEGORY_MAP: Record<string, string> = {
   burn_calculator: 'calculators',
   'medication-scanner': 'medical_knowledge',
@@ -35,22 +34,35 @@ function buildClient() {
   });
 }
 
-type Range = '30min' | '24h' | '7d' | '30d';
+type Range = '30min' | '2h' | '6h' | '24h' | '7d' | '30d' | 'custom';
 
-function getDateRange(range: Range) {
+function getDateRange(range: Range, customStart?: string, customEnd?: string) {
   switch (range) {
     case '30min':
+    case '2h':
+    case '6h':
     case '24h':
       return { startDate: 'today', endDate: 'today' };
     case '7d':
       return { startDate: '7daysAgo', endDate: 'today' };
     case '30d':
       return { startDate: '30daysAgo', endDate: 'today' };
+    case 'custom':
+      return {
+        startDate: customStart ?? '7daysAgo',
+        endDate: customEnd ?? 'today',
+      };
   }
 }
 
-// Safe fallback shape for a failed realtime report
-const EMPTY_RT_REPORT = [{ rows: [] as { dimensionValues?: { value?: string }[]; metricValues?: { value?: string }[] }[] }] as const;
+const EMPTY_RT_REPORT = [
+  {
+    rows: [] as {
+      dimensionValues?: { value?: string }[];
+      metricValues?: { value?: string }[];
+    }[],
+  },
+] as const;
 
 export async function GET(request: NextRequest) {
   const propertyId = process.env.GA_PROPERTY_ID;
@@ -62,20 +74,22 @@ export async function GET(request: NextRequest) {
   ].filter(Boolean);
 
   if (missing.length > 0) {
-    console.error('[analytics/route] Missing env vars:', missing.join(', '));
     return NextResponse.json(
-      { error: `Missing GA4 environment variables: ${missing.join(', ')}` },
+      { error: `חסרים משתני סביבה ל-GA4: ${missing.join(', ')}` },
       { status: 500 }
     );
   }
 
   const rangeParam = request.nextUrl.searchParams.get('range') ?? '24h';
-  const range = (['30min', '24h', '7d', '30d'].includes(rangeParam)
+  const range = (['30min', '2h', '6h', '24h', '7d', '30d', 'custom'].includes(rangeParam)
     ? rangeParam
     : '24h') as Range;
 
-  const dateRange = getDateRange(range);
-  const useHourly = range === '30min' || range === '24h';
+  const customStart = request.nextUrl.searchParams.get('startDate') ?? undefined;
+  const customEnd = request.nextUrl.searchParams.get('endDate') ?? undefined;
+
+  const dateRange = getDateRange(range, customStart, customEnd);
+  const useHourly = range === '30min' || range === '2h' || range === '6h' || range === '24h';
 
   const client = buildClient();
   const property = `properties/${propertyId}`;
@@ -93,8 +107,9 @@ export async function GET(request: NextRequest) {
       screenReport,
       firstOpenReport,
       realtimeFeaturesReport,
+      realtimeHospitalReport,
     ] = await Promise.all([
-      // 1. Summary: active users, sessions, avg duration
+      // 1. Summary
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -114,7 +129,7 @@ export async function GET(request: NextRequest) {
         orderBys: [{ dimension: { dimensionName: useHourly ? 'hour' : 'date' } }],
       }),
 
-      // 3. Feature events: top 10 custom events (auto events excluded)
+      // 3. Feature events: top 10 custom events
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -132,7 +147,7 @@ export async function GET(request: NextRequest) {
         limit: 10,
       }),
 
-      // 4. Cities: top 25 Israeli cities (increased from 10 so list is not cut off)
+      // 4. Cities: top 25
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -162,7 +177,7 @@ export async function GET(request: NextRequest) {
         limit: 25,
       }),
 
-      // 5. Peak hours: hourly aggregation 0-23
+      // 5. Peak hours
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -171,21 +186,21 @@ export async function GET(request: NextRequest) {
         orderBys: [{ dimension: { dimensionName: 'hour' } }],
       }),
 
-      // 6. Realtime: active users last 30 min
+      // 6. Realtime active users
       client.runRealtimeReport({
         property,
         metrics: [{ name: 'activeUsers' }],
         minuteRanges: [{ name: 'last30min', startMinutesAgo: 29, endMinutesAgo: 0 }],
       }),
 
-      // 7. Total installs (all-time cumulative)
+      // 7. Total installs (all-time)
       client.runReport({
         property,
         dateRanges: [{ startDate: '2023-01-01', endDate: 'today' }],
         metrics: [{ name: 'newUsers' }],
       }),
 
-      // 8. Platform / OS breakdown
+      // 8. Platform / OS
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -221,7 +236,7 @@ export async function GET(request: NextRequest) {
         limit: 8,
       }),
 
-      // 10. New users via first_open to avoid counting restarts
+      // 10. New users via first_open
       client.runReport({
         property,
         dateRanges: [dateRange],
@@ -234,9 +249,7 @@ export async function GET(request: NextRequest) {
         },
       }),
 
-      // 11. Realtime feature_interaction events by feature_name (last 30 min)
-      // Uses customEvent:feature_name — requires the dimension to be registered in GA4.
-      // Falls back to empty rows if the dimension is unavailable.
+      // 11. Realtime feature_interaction by feature_name
       client.runRealtimeReport({
         property,
         dimensions: [{ name: 'customEvent:feature_name' }],
@@ -247,6 +260,14 @@ export async function GET(request: NextRequest) {
             stringFilter: { matchType: 'EXACT', value: 'feature_interaction' },
           },
         },
+        minuteRanges: [{ name: 'last30min', startMinutesAgo: 29, endMinutesAgo: 0 }],
+      }).catch(() => EMPTY_RT_REPORT),
+
+      // 12. Realtime hospital_name (active responders at hospitals)
+      client.runRealtimeReport({
+        property,
+        dimensions: [{ name: 'customEvent:hospital_name' }],
+        metrics: [{ name: 'activeUsers' }],
         minuteRanges: [{ name: 'last30min', startMinutesAgo: 29, endMinutesAgo: 0 }],
       }).catch(() => EMPTY_RT_REPORT),
     ]);
@@ -262,6 +283,7 @@ export async function GET(request: NextRequest) {
     const [screenRes] = screenReport;
     const [firstOpenRes] = firstOpenReport;
     const [realtimeFeaturesRes] = realtimeFeaturesReport;
+    const [realtimeHospitalRes] = realtimeHospitalReport;
 
     const summaryStats = {
       activeUsers: parseInt(summaryRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'),
@@ -270,7 +292,7 @@ export async function GET(request: NextRequest) {
       avgSessionDuration: parseFloat(summaryRes.rows?.[0]?.metricValues?.[2]?.value ?? '0'),
     };
 
-    const chartData = (chartRes.rows ?? []).map((row) => {
+    let chartData = (chartRes.rows ?? []).map((row) => {
       const dim = row.dimensionValues?.[0]?.value ?? '';
       const label = useHourly
         ? `${dim.padStart(2, '0')}:00`
@@ -294,8 +316,7 @@ export async function GET(request: NextRequest) {
       users: parseInt(row.metricValues?.[0]?.value ?? '0'),
     }));
 
-    // GA4 returns hour as string with alphabetical ordering — sort numerically after mapping
-    const hourlyData = (hourlyRes.rows ?? [])
+    let hourlyData = (hourlyRes.rows ?? [])
       .map((row) => {
         const h = row.dimensionValues?.[0]?.value ?? '0';
         return {
@@ -305,6 +326,18 @@ export async function GET(request: NextRequest) {
         };
       })
       .sort((a, b) => a.hour - b.hour);
+
+    // Slice to the relevant window for 2h and 6h ranges
+    if (range === '2h' || range === '6h') {
+      const currentHour = new Date().getHours();
+      const hoursBack = range === '2h' ? 2 : 6;
+      const minHour = Math.max(0, currentHour - hoursBack + 1);
+      hourlyData = hourlyData.filter((h) => h.hour >= minHour);
+      chartData = chartData.filter((p) => {
+        const h = parseInt(p.label.split(':')[0], 10);
+        return h >= minHour;
+      });
+    }
 
     const realtimeUsers = parseInt(
       realtimeRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'
@@ -324,7 +357,7 @@ export async function GET(request: NextRequest) {
       views: parseInt(row.metricValues?.[0]?.value ?? '0'),
     }));
 
-    // Aggregate realtime feature interactions into category buckets
+    // Realtime feature interaction aggregation
     const byCategory: Record<string, number> = {
       calculators: 0,
       medical_knowledge: 0,
@@ -343,6 +376,16 @@ export async function GET(request: NextRequest) {
     }
     byFeature.sort((a, b) => b.count - a.count);
 
+    // Realtime hospital data
+    const hospitalData: { name: string; users: number }[] = [];
+    for (const row of realtimeHospitalRes.rows ?? []) {
+      const name = row.dimensionValues?.[0]?.value ?? '';
+      const users = parseInt(row.metricValues?.[0]?.value ?? '0');
+      if (!name || name === '(not set)') continue;
+      hospitalData.push({ name, users });
+    }
+    hospitalData.sort((a, b) => b.users - a.users);
+
     return NextResponse.json(
       {
         summaryStats,
@@ -355,15 +398,24 @@ export async function GET(request: NextRequest) {
         totalInstalls,
         platformData,
         screenData,
-        realtimeInteractions: { byCategory, byFeature },
+        realtimeInteractions: { byCategory, byFeature, hospitalData },
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
+    const msg = String(error);
+    const isQuota =
+      msg.includes('RESOURCE_EXHAUSTED') ||
+      msg.includes('429') ||
+      msg.toLowerCase().includes('quota');
     console.error('[analytics/route] GA4 error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch analytics data' },
-      { status: 500 }
+      {
+        error: isQuota
+          ? 'מכסת GA4 מלאה – המתן מספר שניות ונסה שוב'
+          : 'שגיאה בקבלת נתוני אנליטיקס',
+      },
+      { status: isQuota ? 429 : 500 }
     );
   }
 }
