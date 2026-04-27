@@ -64,6 +64,15 @@ const EMPTY_RT_REPORT = [
   },
 ] as const;
 
+const EMPTY_REPORT = [
+  {
+    rows: [] as {
+      dimensionValues?: { value?: string }[];
+      metricValues?: { value?: string }[];
+    }[],
+  },
+];
+
 export async function GET(request: NextRequest) {
   const propertyId = process.env.GA_PROPERTY_ID;
 
@@ -108,6 +117,8 @@ export async function GET(request: NextRequest) {
       firstOpenReport,
       realtimeFeaturesReport,
       realtimeHospitalReport,
+      todayUsersReport,
+      featureDetailReport,
     ] = await Promise.all([
       // 1. Summary
       client.runReport({
@@ -243,17 +254,11 @@ export async function GET(request: NextRequest) {
         metrics: [{ name: 'newUsers' }],
       }),
 
-      // 11. Realtime feature_interaction by feature_name
+      // 11. Realtime events by feature_name (any event that carries this parameter)
       client.runRealtimeReport({
         property,
         dimensions: [{ name: 'customEvent:feature_name' }],
         metrics: [{ name: 'eventCount' }],
-        dimensionFilter: {
-          filter: {
-            fieldName: 'eventName',
-            stringFilter: { matchType: 'EXACT', value: 'feature_interaction' },
-          },
-        },
         minuteRanges: [{ name: 'last30min', startMinutesAgo: 29, endMinutesAgo: 0 }],
       }).catch(() => EMPTY_RT_REPORT),
 
@@ -264,6 +269,31 @@ export async function GET(request: NextRequest) {
         metrics: [{ name: 'activeUsers' }],
         minuteRanges: [{ name: 'last30min', startMinutesAgo: 29, endMinutesAgo: 0 }],
       }).catch(() => EMPTY_RT_REPORT),
+
+      // 13. Today's active users (start-of-day to now, always today regardless of range)
+      client.runReport({
+        property,
+        dateRanges: [{ startDate: 'today', endDate: 'today' }],
+        metrics: [{ name: 'activeUsers' }],
+      }),
+
+      // 14. Feature events enriched with customEvent:feature_name parameter
+      client.runReport({
+        property,
+        dateRanges: [dateRange],
+        dimensions: [{ name: 'eventName' }, { name: 'customEvent:feature_name' }],
+        metrics: [{ name: 'eventCount' }],
+        dimensionFilter: {
+          notExpression: {
+            filter: {
+              fieldName: 'eventName',
+              inListFilter: { values: AUTO_EVENTS },
+            },
+          },
+        },
+        orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+        limit: 15,
+      }).catch(() => EMPTY_REPORT),
     ]);
 
     const [summaryRes] = summaryReport;
@@ -278,6 +308,8 @@ export async function GET(request: NextRequest) {
     const [firstOpenRes] = firstOpenReport;
     const [realtimeFeaturesRes] = realtimeFeaturesReport;
     const [realtimeHospitalRes] = realtimeHospitalReport;
+    const [todayUsersRes] = todayUsersReport;
+    const [featureDetailRes] = featureDetailReport;
 
     const summaryStats = {
       activeUsers: parseInt(summaryRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'),
@@ -380,6 +412,18 @@ export async function GET(request: NextRequest) {
     }
     hospitalData.sort((a, b) => b.users - a.users);
 
+    const todayActiveUsers = parseInt(
+      todayUsersRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'
+    );
+
+    const featureEventsDetail = (featureDetailRes.rows ?? [])
+      .map((row) => ({
+        eventName: row.dimensionValues?.[0]?.value ?? '',
+        featureName: row.dimensionValues?.[1]?.value ?? '',
+        count: parseInt(row.metricValues?.[0]?.value ?? '0'),
+      }))
+      .filter((r) => r.eventName && r.eventName !== '(not set)');
+
     return NextResponse.json(
       {
         summaryStats,
@@ -393,6 +437,8 @@ export async function GET(request: NextRequest) {
         platformData,
         screenData,
         realtimeInteractions: { byCategory, byFeature, hospitalData },
+        todayActiveUsers,
+        featureEventsDetail,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );

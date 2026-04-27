@@ -60,6 +60,8 @@ interface RealtimeInteractions {
   hospitalData?: HospitalPoint[];
 }
 
+interface FeatureEventDetail { eventName: string; featureName: string; count: number }
+
 interface AnalyticsData {
   summaryStats: SummaryStats;
   chartData: ChartPoint[];
@@ -72,6 +74,8 @@ interface AnalyticsData {
   platformData: PlatformPoint[];
   screenData: ScreenPoint[];
   realtimeInteractions: RealtimeInteractions;
+  todayActiveUsers: number;
+  featureEventsDetail: FeatureEventDetail[];
 }
 
 const RANGES = [
@@ -189,6 +193,16 @@ function hebrewEvent(name: string) {
   if (FEATURE_NAME_LABELS[name]) return FEATURE_NAME_LABELS[name];
   if (EVENT_LABELS[name])        return EVENT_LABELS[name];
   return name.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function buildDetailLabel(eventName: string, featureName: string): string {
+  const feat = featureName && featureName !== '(not set)'
+    ? (FEATURE_NAME_LABELS[featureName] ?? featureName.replace(/[_-]/g, ' '))
+    : null;
+  const eventHeb = EVENT_LABELS[eventName] ?? null;
+  if (feat && eventHeb) return `${eventHeb} · ${feat}`;
+  if (feat) return feat;
+  return hebrewEvent(eventName);
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -418,6 +432,7 @@ function TileGrid({
   loading,
   labelFn,
   tileClass = '',
+  noScroll = false,
 }: {
   items: { id: string; label: string; value: number }[];
   countColor: string;
@@ -425,6 +440,7 @@ function TileGrid({
   loading: boolean;
   labelFn?: (label: string) => string;
   tileClass?: string;
+  noScroll?: boolean;
 }) {
   if (loading) {
     return (
@@ -439,7 +455,7 @@ function TileGrid({
     return <p className="text-sm text-slate-500 text-center py-8">{emptyText}</p>;
   }
   return (
-    <div className="grid grid-cols-3 gap-2 overflow-y-auto max-h-72">
+    <div className={`grid grid-cols-3 gap-2 ${noScroll ? '' : 'overflow-y-auto max-h-72'}`}>
       {items.map((item, i) => {
         const displayLabel = labelFn ? labelFn(item.label) : item.label;
         return (
@@ -457,7 +473,10 @@ function TileGrid({
             >
               {formatNumber(item.value)}
             </span>
-            <span className="text-xs text-slate-400 leading-snug break-words w-full">
+            <span
+              className="text-xs text-slate-400 leading-snug truncate overflow-hidden whitespace-nowrap w-full"
+              title={displayLabel}
+            >
               {displayLabel}
             </span>
           </motion.div>
@@ -708,6 +727,8 @@ export default function AdminDashboard() {
   const [range,        setRange]        = useState<Range>('30min');
   const [customStart,  setCustomStart]  = useState('');
   const [customEnd,    setCustomEnd]    = useState('');
+  const [sheetRowCount, setSheetRowCount] = useState(0);
+  const [sheetsBadge,   setSheetsBadge]  = useState(false);
 
   const fetchData = useCallback(async () => {
     if (range === 'custom' && (!customStart || !customEnd)) return;
@@ -727,6 +748,8 @@ export default function AdminDashboard() {
       const json: AnalyticsData = await res.json();
       setData({
         ...json,
+        todayActiveUsers: json.todayActiveUsers ?? 0,
+        featureEventsDetail: json.featureEventsDetail ?? [],
         realtimeInteractions: json.realtimeInteractions ?? {
           byCategory: { calculators: 0, medical_knowledge: 0, tools: 0, emergency_info: 0 },
           byFeature: [],
@@ -748,13 +771,43 @@ export default function AdminDashboard() {
     return () => clearInterval(id);
   }, [fetchData, range]);
 
+  useEffect(() => {
+    async function checkSheets() {
+      try {
+        const res = await fetch('/api/sheets-count');
+        if (!res.ok) return;
+        const { rowCount } = await res.json();
+        const stored = parseInt(localStorage.getItem('last_seen_count') ?? '0', 10);
+        setSheetRowCount(rowCount);
+        setSheetsBadge(rowCount > stored);
+      } catch {}
+    }
+    checkSheets();
+    const id = setInterval(checkSheets, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const maxHourlySessions = Math.max(...(data?.hourlyData ?? []).map((h) => h.sessions), 1);
 
   const chartTitle = data?.chartType === 'hourly' ? 'פעילות לפי שעה' : 'כניסות לאפליקציה';
   const chartSub   = data?.chartType === 'hourly' ? 'שעות היממה' : rangeSubLabel(range);
 
-  const cityItems     = (data?.cityData     ?? []).map((c) => ({ id: c.city,     label: hebrewCity(c.city), value: c.users }));
-  const featureItems  = (data?.featureEvents ?? []).map((e) => ({ id: e.name,    label: e.name,             value: e.count }));
+  const cityItems = (data?.cityData ?? []).map((c) => ({ id: c.city, label: hebrewCity(c.city), value: c.users }));
+  const featureItems = (() => {
+    const detail = data?.featureEventsDetail ?? [];
+    if (detail.length > 0) {
+      return detail.map((e) => ({
+        id: `${e.eventName}::${e.featureName}`,
+        label: buildDetailLabel(e.eventName, e.featureName),
+        value: e.count,
+      }));
+    }
+    return (data?.featureEvents ?? []).map((e) => ({
+      id: e.name,
+      label: hebrewEvent(e.name),
+      value: e.count,
+    }));
+  })();
   const platformItems = (data?.platformData  ?? []).map((p) => ({ id: p.platform,label: p.platform,         value: p.users }));
   const screenItems   = (data?.screenData    ?? []).map((s) => ({ id: s.screen,  label: s.screen,           value: s.views }));
 
@@ -802,16 +855,25 @@ export default function AdminDashboard() {
                   {lastUpdated.toLocaleTimeString('he-IL')}
                 </span>
               )}
-              <a
-                href="https://docs.google.com/spreadsheets/d/1DiNuIOnOhrMU1GVbPrCd5s2XcIRvPnvIpfiyQnouS28/edit?resourcekey=&gid=893573067#gid=893573067"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-xl border border-teal-400/25 bg-teal-400/[0.08] px-4 py-2 text-sm font-semibold text-teal-400 backdrop-blur-md transition-all hover:bg-teal-400/[0.14] hover:border-teal-400/40"
-                style={{ boxShadow: '0 0 14px rgba(45,212,191,0.12)' }}
-              >
-                <ExternalLink size={14} />
-                ערוץ
-              </a>
+              <div className="relative">
+                <a
+                  href="https://docs.google.com/spreadsheets/d/1DiNuIOnOhrMU1GVbPrCd5s2XcIRvPnvIpfiyQnouS28/edit?resourcekey=&gid=893573067#gid=893573067"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    localStorage.setItem('last_seen_count', sheetRowCount.toString());
+                    setSheetsBadge(false);
+                  }}
+                  className="flex items-center gap-2 rounded-xl border border-teal-400/25 bg-teal-400/[0.08] px-4 py-2 text-sm font-semibold text-teal-400 backdrop-blur-md transition-all hover:bg-teal-400/[0.14] hover:border-teal-400/40"
+                  style={{ boxShadow: '0 0 14px rgba(45,212,191,0.12)' }}
+                >
+                  <ExternalLink size={14} />
+                  ערוץ
+                </a>
+                {sheetsBadge && (
+                  <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 border-2 border-slate-900 animate-pulse" />
+                )}
+              </div>
               <button
                 onClick={fetchData}
                 disabled={loading}
@@ -908,8 +970,8 @@ export default function AdminDashboard() {
                 index={0}
                 icon={Users}
                 label="משתמשים פעילים"
-                rawValue={data?.summaryStats.activeUsers ?? 0}
-                sub={rangeSubLabel(range)}
+                rawValue={data?.todayActiveUsers ?? 0}
+                sub="מתחילת היום"
                 accentBg="bg-indigo-500/20"
                 accentText="text-indigo-400"
                 neonColor="#818cf8"
@@ -1039,7 +1101,6 @@ export default function AdminDashboard() {
             </div>
             <TileGrid
               items={featureItems}
-              labelFn={hebrewEvent}
               countColor="#fbbf24"
               emptyText="אין אירועי פיצ'ר בטווח זה"
               loading={loading}
@@ -1101,6 +1162,7 @@ export default function AdminDashboard() {
               countColor="#2dd4bf"
               emptyText="אין נתוני עיר זמינים"
               loading={loading}
+              noScroll
               tileClass="border-teal-400/15 bg-teal-400/[0.05] hover:border-teal-400/30 hover:bg-teal-400/[0.08]"
             />
           </GlassCard>
