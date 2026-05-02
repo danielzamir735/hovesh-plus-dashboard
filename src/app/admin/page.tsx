@@ -1009,7 +1009,7 @@ export default function AdminDashboard() {
                 icon={UserPlus}
                 label="מכשירים חדשים"
                 rawValue={newUsers}
-                sub="חדשים"
+                sub="first_open בטווח זה"
                 accentBg="bg-sky-500/20"
                 accentText="text-sky-400"
                 neonColor="#38bdf8"
