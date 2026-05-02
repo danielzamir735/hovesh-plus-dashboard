@@ -796,11 +796,18 @@ export default function AdminDashboard() {
   const featureItems = (() => {
     const detail = data?.featureEventsDetail ?? [];
     if (detail.length > 0) {
-      return detail.map((e) => ({
-        id: `${e.eventName}::${e.featureName}`,
-        label: buildDetailLabel(e.eventName, e.featureName),
-        value: e.count,
-      }));
+      const grouped = new Map<string, number>();
+      for (const e of detail) {
+        const key = e.featureName && e.featureName !== '(not set)' ? e.featureName : e.eventName;
+        grouped.set(key, (grouped.get(key) ?? 0) + e.count);
+      }
+      return Array.from(grouped.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([key, count]) => ({
+          id: key,
+          label: FEATURE_NAME_LABELS[key] ?? EVENT_LABELS[key] ?? key.replace(/[_-]/g, ' '),
+          value: count,
+        }));
     }
     return (data?.featureEvents ?? []).map((e) => ({
       id: e.name,
@@ -1002,7 +1009,7 @@ export default function AdminDashboard() {
                 icon={UserPlus}
                 label="מכשירים חדשים"
                 rawValue={newUsers}
-                sub="אימוץ מגיבים חדשים"
+                sub="חדשים"
                 accentBg="bg-sky-500/20"
                 accentText="text-sky-400"
                 neonColor="#38bdf8"
