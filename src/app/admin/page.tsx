@@ -430,21 +430,26 @@ function hebrewCity(name: string) { return CITY_LABELS[name] ?? name; }
 
 function hebrewEvent(name: string): string {
   if (!name || name === '(not set)') return 'לא ידוע';
-  // Normalise: lowercase + spaces/hyphens → underscores
-  const norm = name.toLowerCase().replace(/[\s\-]+/g, '_');
-  if (FEATURE_NAME_LABELS[name])  return FEATURE_NAME_LABELS[name];
-  if (FEATURE_NAME_LABELS[norm])  return FEATURE_NAME_LABELS[norm];
-  if (EVENT_LABELS[name])         return EVENT_LABELS[name];
-  if (EVENT_LABELS[norm])         return EVENT_LABELS[norm];
-  // Try first token: "concentration_view" → "concentration" → "ריכוז תרופה"
-  const parts = norm.split('_').filter(Boolean);
-  if (parts.length > 1) {
-    if (FEATURE_NAME_LABELS[parts[0]]) return FEATURE_NAME_LABELS[parts[0]];
-    if (EVENT_LABELS[parts[0]])        return EVENT_LABELS[parts[0]];
+  // Build multiple normalized forms to maximise map hits
+  const lower    = name.toLowerCase();
+  const withUs   = lower.replace(/[\s\-]+/g, '_');   // spaces/hyphens → underscores
+  const withHyph = lower.replace(/[\s_]+/g,  '-');   // spaces/underscores → hyphens
+  for (const key of [name, lower, withUs, withHyph]) {
+    if (FEATURE_NAME_LABELS[key]) return FEATURE_NAME_LABELS[key];
+    if (EVENT_LABELS[key])        return EVENT_LABELS[key];
   }
-  // Word-by-word translation as last resort
-  const words = parts.map(w => WORD_HEB[w] ?? w);
-  return words.join(' ');
+  // Try first token alone: "concentration_view" → "concentration"
+  const parts = withUs.split('_').filter(Boolean);
+  if (parts.length > 1) {
+    const first      = parts[0];
+    const firstHyph  = parts[0];
+    for (const k of [first, firstHyph, first + 's']) {
+      if (FEATURE_NAME_LABELS[k]) return FEATURE_NAME_LABELS[k];
+      if (EVENT_LABELS[k])        return EVENT_LABELS[k];
+    }
+  }
+  // Word-by-word translation — guaranteed Hebrew output
+  return parts.map(w => WORD_HEB[w] ?? w).join(' ');
 }
 
 function buildDetailLabel(eventName: string, featureName: string): string {

@@ -424,6 +424,10 @@ export async function GET(request: NextRequest) {
       }))
       .filter((r) => r.eventName && r.eventName !== '(not set)');
 
+    // Debug: log raw GA4 keys so we can add missing translations
+    console.log('[GA4 raw keys]', featureEventsDetail.map(e => `${e.eventName} | ${e.featureName}`));
+    console.log('[GA4 featureEvents]', featureEvents.map(e => e.name));
+
     return NextResponse.json(
       {
         summaryStats,
