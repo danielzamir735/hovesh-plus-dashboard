@@ -342,7 +342,6 @@ const FEATURE_NAME_LABELS: Record<string, string> = {
   subscribe:              'מנוי',
   upgrade:                'שדרוג',
   install:                'התקנה',
-  update:                 'עדכון',
   uninstall:              'הסרת התקנה',
 };
 
