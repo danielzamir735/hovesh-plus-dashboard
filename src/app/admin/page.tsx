@@ -124,6 +124,7 @@ function neonPulseClass(value: number, low: number, high: number): string {
 // ─── Translation maps ─────────────────────────────────────────────────────────
 
 const FEATURE_NAME_LABELS: Record<string, string> = {
+  // ── Main features ──────────────────────────────────────────────────────────
   'whatsapp-community':   'קהילת חובש +',
   'kit-standards':        'תקנים לתיקי כונן',
   'realtime-translate':   'תרגום רפואי',
@@ -131,7 +132,7 @@ const FEATURE_NAME_LABELS: Record<string, string> = {
   burn_calculator:        'מחשבון כוויות',
   hospitals:              'מידע בתי חולים',
   simulators:             'סימולטורים ללמידה',
-  // simulator / quiz interactions
+  // ── Simulator / quiz ───────────────────────────────────────────────────────
   answered:               'תשובה בסימולטור',
   question_answered:      'תשובה בסימולטור',
   quiz_answered:          'תשובה בסימולטור',
@@ -141,22 +142,114 @@ const FEATURE_NAME_LABELS: Record<string, string> = {
   simulation_complete:    'סיום סימולציה',
   action_start:           'התחלת פעולה',
   interaction_start:      'התחלת אינטראקציה',
-  // daily / challenge
+  quiz:                   'חידון',
+  quiz_start:             'התחלת חידון',
+  lesson:                 'שיעור',
+  lesson_start:           'התחלת שיעור',
+  lesson_complete:        'סיום שיעור',
+  module:                 'מודול',
+  module_start:           'התחלת מודול',
+  scenario:               'תרחיש',
+  scenario_start:         'התחלת תרחיש',
+  scenario_complete:      'סיום תרחיש',
+  // ── Daily / challenge ─────────────────────────────────────────────────────
   daily_challenge:        'האתגר היומי',
   challenge:              'האתגר היומי',
-  // tools & vitals
+  challenge_start:        'התחלת אתגר',
+  challenge_complete:     'סיום אתגר',
+  // ── Tools & vitals ────────────────────────────────────────────────────────
   vitals:                 'טבלת מדדים',
   vitals_table:           'טבלת מדדים',
+  vitals_recorded:        'רישום מדדים',
   tools:                  'כלי עזר',
   tool:                   'כלי עזר',
-  // medical knowledge
+  metronome:              'מטרונום החייאה',
+  metronome_start:        'הפעלת מטרונום',
+  // ── Medical knowledge ─────────────────────────────────────────────────────
   background_diseases:    'מחלות רקע',
   diseases:               'מחלות רקע',
-  // misc
+  disease:                'מחלת רקע',
+  protocol:               'פרוטוקול',
+  protocols:              'פרוטוקולים',
+  checklist:              'צ\'קליסט',
+  emergency:              'חירום',
+  // ── Medication scanner ────────────────────────────────────────────────────
+  concentration:          'ריכוז תרופה',
+  dose:                   'מינון',
+  dosage:                 'מינון',
+  drug:                   'תרופה',
+  medication:             'תרופה',
+  indication:             'אינדיקציה',
+  contraindication:       'התוויית נגד',
+  side_effect:            'תופעת לוואי',
+  side_effects:           'תופעות לוואי',
+  mechanism:              'מנגנון פעולה',
+  overdose:               'מנת יתר',
+  barcode_scan:           'סריקת ברקוד',
+  scan:                   'סריקה',
+  // ── Actions ───────────────────────────────────────────────────────────────
+  start:                  'התחלה',
+  begin:                  'התחלה',
+  end:                    'סיום',
+  stop:                   'עצירה',
+  pause:                  'השהייה',
+  resume:                 'המשך',
+  use:                    'שימוש',
+  view:                   'צפייה',
+  show:                   'הצגה',
+  hide:                   'הסתרה',
+  open:                   'פתיחה',
+  close:                  'סגירה',
+  search:                 'חיפוש',
+  filter:                 'סינון',
+  sort:                   'מיון',
+  select:                 'בחירה',
+  add:                    'הוספה',
+  remove:                 'הסרה',
+  save:                   'שמירה',
+  delete:                 'מחיקה',
+  edit:                   'עריכה',
+  update:                 'עדכון',
+  submit:                 'שליחה',
+  cancel:                 'ביטול',
+  confirm:                'אישור',
+  reset:                  'איפוס',
+  copy:                   'העתקה',
+  share:                  'שיתוף',
+  send:                   'שליחה',
+  download:               'הורדה',
+  calculate:              'חישוב',
+  click:                  'לחיצה',
+  tap:                    'הקשה',
+  swipe:                  'החלקה',
+  // ── Screen / navigation ───────────────────────────────────────────────────
+  home:                   'דף הבית',
+  menu:                   'תפריט',
+  profile:                'פרופיל',
+  settings:               'הגדרות',
+  help:                   'עזרה',
+  feedback:               'משוב',
+  notification:           'התראה',
+  alert:                  'התראה',
+  result:                 'תוצאה',
+  results:                'תוצאות',
+  details:                'פרטים',
+  info:                   'מידע',
+  information:            'מידע',
+  content:                'תוכן',
+  language:               'שפה',
+  translate:              'תרגום',
+  translation:            'תרגום',
+  community:              'קהילה',
+  onboarding:             'הכנסה למערכת',
+  rating:                 'דירוג',
+  // ── Misc ──────────────────────────────────────────────────────────────────
   selected:               'בחירת תוכן',
   opened:                 'פתיחה',
   modal_opened:           'פתיחת חלונית',
   tutorial_opened:        'פתיחת הדרכה',
+  interaction:            'אינטראקציה',
+  feature_interaction:    'שימוש בפיצ\'ר',
 };
 
 const EVENT_LABELS: Record<string, string> = {
@@ -216,16 +309,27 @@ const CITY_LABELS: Record<string, string> = {
 
 function hebrewCity(name: string)     { return CITY_LABELS[name]   ?? name; }
 function hebrewEvent(name: string) {
-  if (FEATURE_NAME_LABELS[name]) return FEATURE_NAME_LABELS[name];
-  if (EVENT_LABELS[name])        return EVENT_LABELS[name];
-  return name.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  if (!name || name === '(not set)') return 'לא ידוע';
+  const lower = name.toLowerCase().replace(/[_-]/g, '_');
+  if (FEATURE_NAME_LABELS[name])   return FEATURE_NAME_LABELS[name];
+  if (FEATURE_NAME_LABELS[lower])  return FEATURE_NAME_LABELS[lower];
+  if (EVENT_LABELS[name])          return EVENT_LABELS[name];
+  if (EVENT_LABELS[lower])         return EVENT_LABELS[lower];
+  // Try partial match: "concentration_view" → look up "concentration"
+  const firstPart = lower.split('_')[0];
+  if (FEATURE_NAME_LABELS[firstPart]) return FEATURE_NAME_LABELS[firstPart];
+  if (EVENT_LABELS[firstPart])        return EVENT_LABELS[firstPart];
+  return name.replace(/[_-]/g, ' ');
 }
 
 function buildDetailLabel(eventName: string, featureName: string): string {
-  const feat = featureName && featureName !== '(not set)'
-    ? (FEATURE_NAME_LABELS[featureName] ?? featureName.replace(/[_-]/g, ' '))
+  const featRaw = featureName && featureName !== '(not set)' ? featureName : null;
+  const feat = featRaw
+    ? (FEATURE_NAME_LABELS[featRaw]
+        ?? FEATURE_NAME_LABELS[featRaw.toLowerCase()]
+        ?? hebrewEvent(featRaw))
     : null;
-  const eventHeb = EVENT_LABELS[eventName] ?? null;
+  const eventHeb = EVENT_LABELS[eventName] ?? EVENT_LABELS[eventName.toLowerCase()] ?? null;
   if (feat && eventHeb) return `${eventHeb} · ${feat}`;
   if (feat) return feat;
   return hebrewEvent(eventName);
