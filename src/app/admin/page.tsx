@@ -400,19 +400,51 @@ const CITY_LABELS: Record<string, string> = {
   'Tzfat': 'צפת', 'Safed': 'צפת', 'Dimona': 'דימונה',
 };
 
-function hebrewCity(name: string)     { return CITY_LABELS[name]   ?? name; }
-function hebrewEvent(name: string) {
+// Per-word fallback so unknown compound keys (e.g. "daily selected") still render Hebrew
+const WORD_HEB: Record<string, string> = {
+  // verbs / states
+  start:'התחלה', begin:'התחלה', end:'סיום', stop:'עצירה', complete:'השלמה',
+  completed:'הושלם', finish:'סיום', open:'פתיחה', opened:'נפתח', close:'סגירה',
+  closed:'נסגר', select:'בחירה', selected:'נבחר', view:'צפייה', viewed:'נצפה',
+  click:'לחיצה', tap:'הקשה', answer:'תשובה', answered:'נענה', submit:'שליחה',
+  use:'שימוש', add:'הוספה', remove:'הסרה', save:'שמירה', delete:'מחיקה',
+  edit:'עריכה', search:'חיפוש', filter:'סינון', sort:'מיון', share:'שיתוף',
+  send:'שליחה', cancel:'ביטול', confirm:'אישור', reset:'איפוס', skip:'דילוג',
+  back:'חזרה', next:'הבא', play:'הפעלה', scan:'סריקה', download:'הורדה',
+  upload:'העלאה', calculate:'חישוב', show:'הצגה', hide:'הסתרה', record:'הקלטה',
+  // nouns – app features
+  daily:'יומי', challenge:'אתגר', tutorial:'הדרכה', modal:'חלונית',
+  quiz:'חידון', simulation:'סימולציה', simulator:'סימולטור', lesson:'שיעור',
+  module:'מודול', scenario:'תרחיש', action:'פעולה', interaction:'אינטראקציה',
+  feature:'פיצ\'ר', screen:'מסך', page:'דף', button:'כפתור', link:'קישור',
+  card:'כרטיס', item:'פריט', list:'רשימה', category:'קטגוריה', tab:'לשונית',
+  menu:'תפריט', form:'טופס', result:'תוצאה', notification:'התראה',
+  // medical
+  drug:'תרופה', medication:'תרופה', dose:'מינון', hospital:'בית חולים',
+  disease:'מחלה', protocol:'פרוטוקול', checklist:'צ\'קליסט', burn:'כוויה',
+  concentration:'ריכוז', emergency:'חירום', translate:'תרגום', community:'קהילה',
+  kit:'ציוד', standard:'תקן', tool:'כלי', vitals:'מדדים',
+};
+
+function hebrewCity(name: string) { return CITY_LABELS[name] ?? name; }
+
+function hebrewEvent(name: string): string {
   if (!name || name === '(not set)') return 'לא ידוע';
-  const lower = name.toLowerCase().replace(/[_-]/g, '_');
-  if (FEATURE_NAME_LABELS[name])   return FEATURE_NAME_LABELS[name];
-  if (FEATURE_NAME_LABELS[lower])  return FEATURE_NAME_LABELS[lower];
-  if (EVENT_LABELS[name])          return EVENT_LABELS[name];
-  if (EVENT_LABELS[lower])         return EVENT_LABELS[lower];
-  // Try partial match: "concentration_view" → look up "concentration"
-  const firstPart = lower.split('_')[0];
-  if (FEATURE_NAME_LABELS[firstPart]) return FEATURE_NAME_LABELS[firstPart];
-  if (EVENT_LABELS[firstPart])        return EVENT_LABELS[firstPart];
-  return name.replace(/[_-]/g, ' ');
+  // Normalise: lowercase + spaces/hyphens → underscores
+  const norm = name.toLowerCase().replace(/[\s\-]+/g, '_');
+  if (FEATURE_NAME_LABELS[name])  return FEATURE_NAME_LABELS[name];
+  if (FEATURE_NAME_LABELS[norm])  return FEATURE_NAME_LABELS[norm];
+  if (EVENT_LABELS[name])         return EVENT_LABELS[name];
+  if (EVENT_LABELS[norm])         return EVENT_LABELS[norm];
+  // Try first token: "concentration_view" → "concentration" → "ריכוז תרופה"
+  const parts = norm.split('_').filter(Boolean);
+  if (parts.length > 1) {
+    if (FEATURE_NAME_LABELS[parts[0]]) return FEATURE_NAME_LABELS[parts[0]];
+    if (EVENT_LABELS[parts[0]])        return EVENT_LABELS[parts[0]];
+  }
+  // Word-by-word translation as last resort
+  const words = parts.map(w => WORD_HEB[w] ?? w);
+  return words.join(' ');
 }
 
 function buildDetailLabel(eventName: string, featureName: string): string {
