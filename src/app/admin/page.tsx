@@ -124,13 +124,39 @@ function neonPulseClass(value: number, low: number, high: number): string {
 // ─── Translation maps ─────────────────────────────────────────────────────────
 
 const FEATURE_NAME_LABELS: Record<string, string> = {
-  'whatsapp-community': 'קהילת חובש +',
-  'kit-standards':      'תקנים לתיקי כונן',
-  'realtime-translate': 'תרגום רפואי',
-  'medication-scanner': 'מידע על תרופות',
-  burn_calculator:      'מחשבון כוויות',
-  hospitals:            'מידע בתי חולים',
-  simulators:           'סימולטורים ללמידה',
+  'whatsapp-community':   'קהילת חובש +',
+  'kit-standards':        'תקנים לתיקי כונן',
+  'realtime-translate':   'תרגום רפואי',
+  'medication-scanner':   'מידע על תרופות',
+  burn_calculator:        'מחשבון כוויות',
+  hospitals:              'מידע בתי חולים',
+  simulators:             'סימולטורים ללמידה',
+  // simulator / quiz interactions
+  answered:               'תשובה בסימולטור',
+  question_answered:      'תשובה בסימולטור',
+  quiz_answered:          'תשובה בסימולטור',
+  complete:               'השלמת מודול',
+  completed:              'השלמת מודול',
+  quiz_complete:          'סיום חידון',
+  simulation_complete:    'סיום סימולציה',
+  action_start:           'התחלת פעולה',
+  interaction_start:      'התחלת אינטראקציה',
+  // daily / challenge
+  daily_challenge:        'האתגר היומי',
+  challenge:              'האתגר היומי',
+  // tools & vitals
+  vitals:                 'טבלת מדדים',
+  vitals_table:           'טבלת מדדים',
+  tools:                  'כלי עזר',
+  tool:                   'כלי עזר',
+  // medical knowledge
+  background_diseases:    'מחלות רקע',
+  diseases:               'מחלות רקע',
+  // misc
+  selected:               'בחירת תוכן',
+  opened:                 'פתיחה',
+  modal_opened:           'פתיחת חלונית',
+  tutorial_opened:        'פתיחת הדרכה',
 };
 
 const EVENT_LABELS: Record<string, string> = {
@@ -446,7 +472,7 @@ function TileGrid({
     return (
       <div className="grid grid-cols-3 gap-2">
         {Array.from({ length: 6 }).map((_, i) => (
-          <SkeletonBlock key={i} className="h-16" />
+          <SkeletonBlock key={i} className="h-20" />
         ))}
       </div>
     );
@@ -465,7 +491,7 @@ function TileGrid({
             variants={fadeUp}
             initial="hidden"
             animate="visible"
-            className={`rounded-xl border p-2.5 flex flex-col items-center gap-1.5 text-center min-h-[4rem] justify-center transition-all duration-300 ${tileClass}`}
+            className={`rounded-xl border p-3 flex flex-col items-center gap-1.5 text-center min-h-[5rem] justify-center transition-all duration-300 ${tileClass}`}
           >
             <span
               className="text-lg font-bold tabular-nums leading-tight"
@@ -474,7 +500,7 @@ function TileGrid({
               {formatNumber(item.value)}
             </span>
             <span
-              className="text-xs text-slate-400 leading-snug truncate overflow-hidden whitespace-nowrap w-full"
+              className="text-[11px] text-slate-400 leading-snug break-words w-full"
               title={displayLabel}
             >
               {displayLabel}
