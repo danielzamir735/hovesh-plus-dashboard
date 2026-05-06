@@ -24,6 +24,14 @@ function parsePrivateKey(raw: string): string {
   return stripped.replace(/\\n/g, '\n');
 }
 
+function getIsraelNow(): Date {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+}
+
+function formatDateGA4(d: Date): string {
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function buildClient() {
   const privateKey = parsePrivateKey(process.env.GA_PRIVATE_KEY!);
   return new BetaAnalyticsDataClient({
@@ -103,6 +111,17 @@ export async function GET(request: NextRequest) {
   const client = buildClient();
   const property = `properties/${propertyId}`;
 
+  // For 2h rolling window: always fetch yesterday+today with date+hour dimensions
+  const chartDateRange = range === '2h'
+    ? { startDate: '1daysAgo', endDate: 'today' }
+    : dateRange;
+  const chartDimensions = range === '2h'
+    ? [{ name: 'date' }, { name: 'hour' }]
+    : [{ name: useHourly ? 'hour' : 'date' }];
+  const chartOrderBys = range === '2h'
+    ? [{ dimension: { dimensionName: 'date' } }, { dimension: { dimensionName: 'hour' } }]
+    : [{ dimension: { dimensionName: useHourly ? 'hour' : 'date' } }];
+
   try {
     const [
       summaryReport,
@@ -119,6 +138,7 @@ export async function GET(request: NextRequest) {
       realtimeHospitalReport,
       todayUsersReport,
       featureDetailReport,
+      activeUsers5minReport,
     ] = await Promise.all([
       // 1. Summary
       client.runReport({
@@ -131,13 +151,13 @@ export async function GET(request: NextRequest) {
         ],
       }),
 
-      // 2. Chart: hourly or daily
+      // 2. Chart: hourly or daily (2h uses 1daysAgo+today with date+hour for rolling window)
       client.runReport({
         property,
-        dateRanges: [dateRange],
-        dimensions: [{ name: useHourly ? 'hour' : 'date' }],
+        dateRanges: [chartDateRange],
+        dimensions: chartDimensions,
         metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
-        orderBys: [{ dimension: { dimensionName: useHourly ? 'hour' : 'date' } }],
+        orderBys: chartOrderBys,
       }),
 
       // 3. Feature events: top 10 custom events
@@ -294,6 +314,13 @@ export async function GET(request: NextRequest) {
         orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
         limit: 15,
       }).catch(() => EMPTY_REPORT),
+
+      // 15. Realtime 5-min active users (unique devices active in last 5 minutes)
+      client.runRealtimeReport({
+        property,
+        metrics: [{ name: 'activeUsers' }],
+        minuteRanges: [{ name: 'last5min', startMinutesAgo: 4, endMinutesAgo: 0 }],
+      }).catch(() => EMPTY_RT_REPORT),
     ]);
 
     const [summaryRes] = summaryReport;
@@ -310,6 +337,7 @@ export async function GET(request: NextRequest) {
     const [realtimeHospitalRes] = realtimeHospitalReport;
     const [todayUsersRes] = todayUsersReport;
     const [featureDetailRes] = featureDetailReport;
+    const [rt5minRes] = activeUsers5minReport;
 
     const summaryStats = {
       activeUsers: parseInt(summaryRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'),
@@ -318,19 +346,42 @@ export async function GET(request: NextRequest) {
       avgSessionDuration: parseFloat(summaryRes.rows?.[0]?.metricValues?.[2]?.value ?? '0'),
     };
 
-    let chartData = (chartRes.rows ?? []).map((row) => {
-      const dim = row.dimensionValues?.[0]?.value ?? '';
-      const label = useHourly
-        ? `${dim.padStart(2, '0')}:00`
-        : dim.length === 8
-          ? `${dim.slice(6, 8)}/${dim.slice(4, 6)}`
-          : dim;
-      return {
-        label,
-        sessions: parseInt(row.metricValues?.[0]?.value ?? '0'),
-        users: parseInt(row.metricValues?.[1]?.value ?? '0'),
-      };
-    });
+    // Build chartData — 2h uses date+hour dims for true rolling cross-midnight window
+    let chartData: { label: string; sessions: number; users: number }[] = [];
+    if (range === '2h') {
+      const israelNow = getIsraelNow();
+      const todayStr = formatDateGA4(israelNow);
+      const currentHour = israelNow.getHours();
+      chartData = (chartRes.rows ?? [])
+        .filter((row) => {
+          const rowDate = row.dimensionValues?.[0]?.value ?? '';
+          const rowHour = parseInt(row.dimensionValues?.[1]?.value ?? '0', 10);
+          // hoursAgo = how many whole hours since start of rowHour
+          const hoursAgo = rowDate === todayStr
+            ? currentHour - rowHour
+            : 24 + currentHour - rowHour;
+          return hoursAgo >= 0 && hoursAgo <= 2;
+        })
+        .map((row) => ({
+          label: `${String(parseInt(row.dimensionValues?.[1]?.value ?? '0', 10)).padStart(2, '0')}:00`,
+          sessions: parseInt(row.metricValues?.[0]?.value ?? '0'),
+          users: parseInt(row.metricValues?.[1]?.value ?? '0'),
+        }));
+    } else {
+      chartData = (chartRes.rows ?? []).map((row) => {
+        const dim = row.dimensionValues?.[0]?.value ?? '';
+        const label = useHourly
+          ? `${dim.padStart(2, '0')}:00`
+          : dim.length === 8
+            ? `${dim.slice(6, 8)}/${dim.slice(4, 6)}`
+            : dim;
+        return {
+          label,
+          sessions: parseInt(row.metricValues?.[0]?.value ?? '0'),
+          users: parseInt(row.metricValues?.[1]?.value ?? '0'),
+        };
+      });
+    }
 
     const featureEvents = (eventsRes.rows ?? []).map((row) => ({
       name: row.dimensionValues?.[0]?.value ?? '',
@@ -353,11 +404,10 @@ export async function GET(request: NextRequest) {
       })
       .sort((a, b) => a.hour - b.hour);
 
-    // Slice to the relevant window for 2h and 6h ranges
-    if (range === '2h' || range === '6h') {
-      const currentHour = new Date().getHours();
-      const hoursBack = range === '2h' ? 2 : 6;
-      const minHour = Math.max(0, currentHour - hoursBack + 1);
+    // Slice chart/hourly to 6h window using IDT (2h is already handled above)
+    if (range === '6h') {
+      const israelNow = getIsraelNow();
+      const minHour = Math.max(0, israelNow.getHours() - 5);
       hourlyData = hourlyData.filter((h) => h.hour >= minHour);
       chartData = chartData.filter((p) => {
         const h = parseInt(p.label.split(':')[0], 10);
@@ -412,8 +462,14 @@ export async function GET(request: NextRequest) {
     }
     hospitalData.sort((a, b) => b.users - a.users);
 
-    const todayActiveUsers = parseInt(
-      todayUsersRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'
+    // Ensure today's total is never lower than the 30-min realtime count (GA4 processing lag)
+    const todayActiveUsers = Math.max(
+      parseInt(todayUsersRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'),
+      realtimeUsers
+    );
+
+    const activeUsers5min = parseInt(
+      rt5minRes.rows?.[0]?.metricValues?.[0]?.value ?? '0'
     );
 
     const featureEventsDetail = (featureDetailRes.rows ?? [])
@@ -442,6 +498,7 @@ export async function GET(request: NextRequest) {
         screenData,
         realtimeInteractions: { byCategory, byFeature, hospitalData },
         todayActiveUsers,
+        activeUsers5min,
         featureEventsDetail,
       },
       { headers: { 'Cache-Control': 'no-store' } }

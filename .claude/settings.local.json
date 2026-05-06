@@ -5,7 +5,18 @@
       "Bash(mkdir -p /c/Users/User/Desktop/hovesh-plus-dashboard/src/app/admin)",
       "Bash(npx tsc:*)",
       "Bash(npx eslint:*)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(git -C \"C:\\\\Users\\\\User\\\\Desktop\\\\hovesh-plus-dashboard\" log --oneline)",
+      "Bash(npx next *)",
+      "Bash(git commit *)",
+      "Bash(node -e ' *)",
+      "Bash(git add *)",
+      "Bash(git push *)",
+      "Bash(vercel --version)",
+      "Bash(vercel link *)",
+      "Bash(vercel --prod)",
+      "Bash(Test-Path *)",
+      "Bash(vercel)"
     ]
   }
 }

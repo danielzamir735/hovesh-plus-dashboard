@@ -24,6 +24,7 @@ import {
   Radio,
   Building2,
   CalendarDays,
+  Info,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -75,6 +76,7 @@ interface AnalyticsData {
   screenData: ScreenPoint[];
   realtimeInteractions: RealtimeInteractions;
   todayActiveUsers: number;
+  activeUsers5min: number;
   featureEventsDetail: FeatureEventDetail[];
 }
 
@@ -105,7 +107,7 @@ function formatDuration(seconds: number): string {
 function rangeSubLabel(range: Range): string {
   switch (range) {
     case '30min':  return 'חצי שעה אחרונה';
-    case '2h':     return '2 שעות אחרונות';
+    case '2h':     return '2 שעות גלגול (חוצה חצות)';
     case '6h':     return '6 שעות אחרונות';
     case '24h':    return 'היום';
     case '7d':     return '7 הימים האחרונים';
@@ -590,6 +592,7 @@ function StatCard({
   index,
   neonColor,
   pulseClass,
+  tooltip,
 }: {
   icon: React.ElementType;
   label: string;
@@ -602,6 +605,7 @@ function StatCard({
   index: number;
   neonColor?: string;
   pulseClass?: string;
+  tooltip?: string;
 }) {
   return (
     <GlassCard
@@ -611,7 +615,10 @@ function StatCard({
       pulseClass={pulseClass}
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-400 leading-tight">{label}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-slate-400 leading-tight">{label}</span>
+          {tooltip && <InfoTooltip text={tooltip} />}
+        </div>
         <div className={`p-2 rounded-xl ${accentBg} shrink-0`}>
           <Icon size={15} className={accentText} />
         </div>
@@ -679,6 +686,19 @@ function SkeletonBlock({ className = '' }: { className?: string }) {
   return (
     <div className={`rounded-xl overflow-hidden relative bg-white/[0.03] border border-white/[0.05] ${className}`}>
       <div className="absolute inset-0 shimmer" />
+    </div>
+  );
+}
+
+// ─── InfoTooltip ──────────────────────────────────────────────────────────────
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <div className="group relative inline-flex items-center">
+      <Info size={11} className="text-slate-600 cursor-help hover:text-slate-400 transition-colors" />
+      <div className="pointer-events-none absolute bottom-full right-0 mb-2 w-52 rounded-xl border border-white/10 bg-slate-900/95 backdrop-blur-md px-3 py-2 text-[11px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-2xl z-50 leading-relaxed">
+        {text}
+      </div>
     </div>
   );
 }
@@ -822,10 +842,20 @@ function RankedList({
 
 // ─── Live Feed ────────────────────────────────────────────────────────────────
 
-function LiveFeed({ data, loading }: { data: AnalyticsData | null; loading: boolean }) {
+function LiveFeed({
+  data,
+  loading,
+  liveUsers,
+  live5min,
+}: {
+  data: AnalyticsData | null;
+  loading: boolean;
+  liveUsers: number;
+  live5min: number;
+}) {
   const interactions  = data?.realtimeInteractions;
   const total         = Object.values(interactions?.byCategory ?? {}).reduce((a, b) => a + b, 0);
-  const activeNow     = data?.realtimeUsers ?? 0;
+  const activeNow     = liveUsers;
   const topFeatureRaw = interactions?.byFeature?.[0]?.name ?? null;
   const topFeature    = topFeatureRaw ? hebrewEvent(topFeatureRaw) : null;
   const topCity       = data?.cityData?.[0]?.city ? hebrewCity(data.cityData[0].city) : null;
@@ -865,10 +895,12 @@ function LiveFeed({ data, loading }: { data: AnalyticsData | null; loading: bool
         </div>
       ) : (
         <div className="mb-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {/* Active now */}
+          {/* Active now – shows both 5-min and 30-min */}
           <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] p-3 text-center flex flex-col justify-center min-h-[5rem]">
-            <p className="text-xl font-bold text-emerald-400"><AnimatedNumber value={activeNow} /></p>
-            <p className="text-xs text-slate-400 mt-1 leading-tight">פעילים<br />עכשיו</p>
+            <p className="text-xl font-bold text-emerald-400"><AnimatedNumber value={live5min} /></p>
+            <p className="text-[10px] text-slate-500 leading-tight">5 דק׳</p>
+            <p className="text-sm font-semibold text-teal-400 mt-1"><AnimatedNumber value={activeNow} /></p>
+            <p className="text-[10px] text-slate-500 leading-tight">30 דק׳</p>
           </div>
           {/* Top feature */}
           <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-3 text-center flex flex-col justify-center min-h-[5rem]">
@@ -989,6 +1021,7 @@ export default function AdminDashboard() {
   const [customEnd,    setCustomEnd]    = useState('');
   const [sheetRowCount, setSheetRowCount] = useState(0);
   const [sheetsBadge,   setSheetsBadge]  = useState(false);
+  const [realtimeFast, setRealtimeFast] = useState({ activeUsers5min: 0, activeUsers30min: 0 });
 
   const fetchData = useCallback(async () => {
     if (range === 'custom' && (!customStart || !customEnd)) return;
@@ -1009,6 +1042,7 @@ export default function AdminDashboard() {
       setData({
         ...json,
         todayActiveUsers: json.todayActiveUsers ?? 0,
+        activeUsers5min:  json.activeUsers5min  ?? 0,
         featureEventsDetail: json.featureEventsDetail ?? [],
         realtimeInteractions: json.realtimeInteractions ?? {
           byCategory: { calculators: 0, medical_knowledge: 0, tools: 0, emergency_info: 0 },
@@ -1030,6 +1064,24 @@ export default function AdminDashboard() {
     const id = setInterval(fetchData, 5 * 60 * 1000);
     return () => clearInterval(id);
   }, [fetchData, range]);
+
+  // Fast-poll realtime metrics every 30 seconds without triggering full reload
+  useEffect(() => {
+    async function fetchRealtime() {
+      try {
+        const res = await fetch('/api/analytics/realtime', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        setRealtimeFast({
+          activeUsers5min:  json.activeUsers5min  ?? 0,
+          activeUsers30min: json.activeUsers30min ?? 0,
+        });
+      } catch {}
+    }
+    fetchRealtime();
+    const id = setInterval(fetchRealtime, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     async function checkSheets() {
@@ -1078,9 +1130,13 @@ export default function AdminDashboard() {
   const platformItems = (data?.platformData  ?? []).map((p) => ({ id: p.platform,label: p.platform,         value: p.users }));
   const screenItems   = (data?.screenData    ?? []).map((s) => ({ id: s.screen,  label: s.screen,           value: s.views }));
 
-  const liveUsers  = data?.realtimeUsers ?? 0;
+  // Use fast-polled realtime values when available (updated every 30s)
+  const liveUsers  = Math.max(realtimeFast.activeUsers30min, data?.realtimeUsers ?? 0);
+  const live5min   = Math.max(realtimeFast.activeUsers5min,  data?.activeUsers5min ?? 0);
+  const todayUsers = Math.max(data?.todayActiveUsers ?? 0, liveUsers);
   const newUsers   = data?.summaryStats.newUsers ?? 0;
   const livePulse  = neonPulseClass(liveUsers, 3, 10);
+  const pulse5min  = neonPulseClass(live5min,  2,  8);
   const newPulse   = neonPulseClass(newUsers,  5, 20);
 
   return (
@@ -1228,34 +1284,48 @@ export default function AdminDashboard() {
         </AnimatePresence>
 
         {/* ── Bento Stat Cards ── */}
-        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
           {loading ? (
-            Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+            Array.from({ length: 7 }).map((_, i) => <SkeletonCard key={i} />)
           ) : (
             <>
               <StatCard
                 index={0}
                 icon={Users}
-                label="משתמשים פעילים"
-                rawValue={data?.todayActiveUsers ?? 0}
-                sub="מתחילת היום"
+                label="סה״כ היום"
+                rawValue={todayUsers}
+                sub="ממידנוח (שעון ישראל)"
                 accentBg="bg-indigo-500/20"
                 accentText="text-indigo-400"
                 neonColor="#818cf8"
+                tooltip="משתמשים ייחודיים (לפי מזהה מכשיר) שהיו פעילים מאז 00:00 שעון ישראל. לעולם לא יהיה נמוך ממספר הפעילים ב-30 דקות."
               />
               <StatCard
                 index={1}
                 icon={Activity}
-                label="פעילים עכשיו"
-                rawValue={liveUsers}
-                sub="30 דקות אחרונות"
+                label="פעילים – 5 דק׳"
+                rawValue={live5min}
+                sub="5 דקות אחרונות"
                 accentBg="bg-emerald-500/20"
                 accentText="text-emerald-400"
                 neonColor="#34d399"
-                pulseClass={livePulse}
+                pulseClass={pulse5min}
+                tooltip="משתמשים ייחודיים שביצעו פעולה כלשהי ב-5 הדקות האחרונות. מתעדכן כל 30 שניות."
               />
               <StatCard
                 index={2}
+                icon={Activity}
+                label="פעילים – 30 דק׳"
+                rawValue={liveUsers}
+                sub="חצי שעה אחרונה"
+                accentBg="bg-teal-500/20"
+                accentText="text-teal-400"
+                neonColor="#2dd4bf"
+                pulseClass={livePulse}
+                tooltip="משתמשים ייחודיים שביצעו פעולה כלשהי ב-30 הדקות האחרונות. מתעדכן כל 30 שניות."
+              />
+              <StatCard
+                index={3}
                 icon={TrendingUp}
                 label="סשנים"
                 rawValue={data?.summaryStats.sessions ?? 0}
@@ -1263,9 +1333,10 @@ export default function AdminDashboard() {
                 accentBg="bg-violet-500/20"
                 accentText="text-violet-400"
                 neonColor="#a78bfa"
+                tooltip="מספר הסשנים הכולל — משתמש אחד יכול לפתוח כמה סשנים. אינו זהה למספר המשתמשים הייחודיים."
               />
               <StatCard
-                index={3}
+                index={4}
                 icon={UserPlus}
                 label="מכשירים חדשים"
                 rawValue={newUsers}
@@ -1274,9 +1345,10 @@ export default function AdminDashboard() {
                 accentText="text-sky-400"
                 neonColor="#38bdf8"
                 pulseClass={newPulse}
+                tooltip="מכשירים שפתחו את האפליקציה לראשונה (אירוע first_open). מייצג התקנות חדשות בטווח הנבחר."
               />
               <StatCard
-                index={4}
+                index={5}
                 icon={Clock}
                 label="זמן שהייה"
                 rawValue={data?.summaryStats.avgSessionDuration ?? 0}
@@ -1286,13 +1358,14 @@ export default function AdminDashboard() {
                 accentText="text-amber-400"
               />
               <StatCard
-                index={5}
+                index={6}
                 icon={Download}
                 label='סה"כ התקנות'
                 rawValue={data?.totalInstalls ?? 0}
                 sub="מאז הפעלת האפליקציה"
                 accentBg="bg-rose-500/20"
                 accentText="text-rose-400"
+                tooltip="סך כל המכשירים שהתקינו את האפליקציה מאז ינואר 2023 (אירוע newUsers מצטבר)."
               />
             </>
           )}
@@ -1300,7 +1373,7 @@ export default function AdminDashboard() {
 
         {/* ── Live Feed ── */}
         <div className="mb-6">
-          <LiveFeed data={data} loading={loading} />
+          <LiveFeed data={data} loading={loading} liveUsers={liveUsers} live5min={live5min} />
         </div>
 
         {/* ── Main chart + Features ── */}
@@ -1346,10 +1419,14 @@ export default function AdminDashboard() {
             {!loading && (
               <div className="mt-4 flex items-center gap-5 justify-end text-xs text-slate-500">
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-4 rounded-full bg-indigo-500" />סשנים
+                  <span className="inline-block h-2 w-4 rounded-full bg-indigo-500" />
+                  סשנים
+                  <InfoTooltip text="כניסות לאפליקציה — משתמש אחד יכול לפתוח מספר סשנים." />
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-4 rounded-full bg-violet-500" />משתמשים
+                  <span className="inline-block h-2 w-4 rounded-full bg-violet-500" />
+                  משתמשים ייחודיים
+                  <InfoTooltip text="מכשירים ייחודיים (activeUsers) — כל מכשיר נספר פעם אחת, ללא קשר לכמה סשנים פתח." />
                 </span>
               </div>
             )}
@@ -1361,9 +1438,12 @@ export default function AdminDashboard() {
               <div className="p-2 rounded-xl bg-amber-500/15">
                 <Zap size={17} className="text-amber-400" />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <h2 className="font-semibold text-white">פיצ&apos;רים בשימוש</h2>
-                <p className="text-xs text-slate-500">אירועי אפליקציה</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <p className="text-xs text-slate-500">סה&quot;כ פעולות (לא משתמשים ייחודיים)</p>
+                  <InfoTooltip text="המספרים מייצגים סך הפעולות (eventCount) — לא משתמשים ייחודיים. משתמש שפתח פיצ׳ר 3 פעמים נספר 3." />
+                </div>
               </div>
             </div>
             <TileGrid
