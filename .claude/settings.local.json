@@ -16,7 +16,8 @@
       "Bash(vercel link *)",
       "Bash(vercel --prod)",
       "Bash(Test-Path *)",
-      "Bash(vercel)"
+      "Bash(vercel)",
+      "Bash(npm run *)"
     ]
   }
 }

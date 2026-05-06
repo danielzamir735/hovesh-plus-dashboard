@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback, createContext, useContext } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState, useCallback } from 'react';
+import { motion, AnimatePresence, animate } from 'framer-motion';
 import {
   Users,
   Activity,
-  Sun,
-  Moon,
   TrendingUp,
   UserPlus,
   Zap,
@@ -40,12 +38,6 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-
-// ─── Theme ───────────────────────────────────────────────────────────────────
-
-type ThemeMode = 'dark' | 'light';
-const ThemeCtx = createContext<ThemeMode>('dark');
-const useTheme = () => useContext(ThemeCtx);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -530,7 +522,29 @@ function AnimatedNumber({
   value: number;
   format?: (n: number) => string;
 }) {
-  return <span className="tabular-nums inline-block">{fmt(value)}</span>;
+  const [display, setDisplay] = useState(0);
+  const [rev, setRev] = useState(0);
+
+  useEffect(() => {
+    setRev((r) => r + 1);
+    const ctrl = animate(0, value, {
+      duration: 1.4,
+      ease: 'easeOut',
+      onUpdate: (v) => setDisplay(Math.round(v)),
+    });
+    return () => ctrl.stop();
+  }, [value]);
+
+  return (
+    <motion.span
+      key={rev}
+      className="tabular-nums inline-block"
+      animate={{ scale: [1, 1.06, 1] }}
+      transition={{ duration: 0.45, times: [0, 0.28, 1], ease: 'easeOut' }}
+    >
+      {fmt(display)}
+    </motion.span>
+  );
 }
 
 // ─── GlassCard ────────────────────────────────────────────────────────────────
@@ -550,32 +564,18 @@ function GlassCard({
   pulseClass?: string;
   style?: React.CSSProperties;
 }) {
-  const theme = useTheme();
-  const isDark = theme === 'dark';
-
-  const baseStyle: React.CSSProperties = isDark
-    ? (neonColor
-        ? {
-            borderColor: neonColor + '28',
-            boxShadow: `0 0 28px ${neonColor}14, inset 0 1px 0 rgba(255,255,255,0.06)`,
-            '--neon': neonColor,
-            ...extStyle,
-          } as React.CSSProperties
-        : {
-            borderColor: 'rgba(255,255,255,0.07)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-            ...extStyle,
-          })
+  const baseStyle: React.CSSProperties = neonColor
+    ? {
+        borderColor: neonColor + '28',
+        boxShadow: `0 0 28px ${neonColor}14, inset 0 1px 0 rgba(255,255,255,0.06)`,
+        '--neon': neonColor,
+        ...extStyle,
+      } as React.CSSProperties
     : {
-        background: '#ffffff',
-        borderColor: 'rgba(100,116,139,0.15)',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)',
+        borderColor: 'rgba(255,255,255,0.07)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
         ...extStyle,
       };
-
-  const cardCls = isDark
-    ? `relative rounded-2xl border bg-white/[0.04] backdrop-blur-2xl ${pulseClass ?? ''} ${className}`
-    : `relative rounded-2xl border bg-white ${pulseClass ?? ''} ${className}`;
 
   return (
     <motion.div
@@ -583,7 +583,7 @@ function GlassCard({
       variants={fadeUp}
       initial="hidden"
       animate="visible"
-      className={cardCls}
+      className={`relative rounded-2xl border bg-white/[0.04] backdrop-blur-2xl ${pulseClass ?? ''} ${className}`}
       style={baseStyle}
     >
       {children}
@@ -682,27 +682,22 @@ function BarTooltip({ active, payload, label }: any) {
 // ─── Shimmer skeleton ─────────────────────────────────────────────────────────
 
 function SkeletonCard() {
-  const isDark = useTheme() === 'dark';
-  const bg  = isDark ? 'bg-white/[0.03] border-white/[0.06]'  : 'bg-slate-100 border-slate-200';
-  const el  = isDark ? 'bg-white/[0.06]'                       : 'bg-slate-200/70';
   return (
-    <div className={`rounded-2xl border ${bg} p-5 overflow-hidden relative`}>
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 overflow-hidden relative">
       <div className="absolute inset-0 shimmer" />
       <div className="relative flex justify-between mb-4">
-        <div className={`h-3 w-20 rounded-lg ${el}`} />
-        <div className={`h-7 w-7 rounded-xl ${el}`} />
+        <div className="h-3 w-20 rounded-lg bg-white/[0.06]" />
+        <div className="h-7 w-7 rounded-xl bg-white/[0.06]" />
       </div>
-      <div className={`relative h-8 w-28 rounded-lg ${el} mb-2`} />
-      <div className={`relative h-2.5 w-16 rounded-lg ${el}`} />
+      <div className="relative h-8 w-28 rounded-lg bg-white/[0.06] mb-2" />
+      <div className="relative h-2.5 w-16 rounded-lg bg-white/[0.06]" />
     </div>
   );
 }
 
 function SkeletonBlock({ className = '' }: { className?: string }) {
-  const isDark = useTheme() === 'dark';
-  const bg = isDark ? 'bg-white/[0.03] border-white/[0.05]' : 'bg-slate-100 border-slate-200';
   return (
-    <div className={`rounded-xl overflow-hidden relative border ${bg} ${className}`}>
+    <div className={`rounded-xl overflow-hidden relative bg-white/[0.03] border border-white/[0.05] ${className}`}>
       <div className="absolute inset-0 shimmer" />
     </div>
   );
@@ -1234,7 +1229,6 @@ export default function AdminDashboard() {
   const [customEnd,    setCustomEnd]    = useState('');
   const [sheetRowCount, setSheetRowCount] = useState(0);
   const [sheetsBadge,   setSheetsBadge]  = useState(false);
-  const [theme, setTheme] = useState<ThemeMode>('dark');
   const [realtimeFast, setRealtimeFast] = useState<RealtimeFast>({
     activeUsers5min: 0,
     activeUsers30min: 0,
@@ -1242,20 +1236,6 @@ export default function AdminDashboard() {
     cities5min: [], devices5min: [], hospitals5min: [],
     timeline5min: [], timeline30min: [],
   });
-
-  // Persist theme to localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('dashboard_theme') as ThemeMode | null;
-    if (saved === 'dark' || saved === 'light') setTheme(saved);
-  }, []);
-
-  const toggleTheme = () => {
-    setTheme((t) => {
-      const next = t === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('dashboard_theme', next);
-      return next;
-    });
-  };
 
   const fetchData = useCallback(async () => {
     if (range === 'custom' && (!customStart || !customEnd)) return;
@@ -1414,29 +1394,18 @@ export default function AdminDashboard() {
   const pulse5min  = neonPulseClass(live5min,  2,  8);
   const newPulse   = neonPulseClass(newUsers,  5, 20);
 
-  const isDark = theme === 'dark';
-
   return (
-    <ThemeCtx.Provider value={theme}>
     <main
       dir="rtl"
-      className={`relative min-h-screen overflow-x-hidden ${isDark ? 'text-slate-100' : 'text-slate-900 dashboard-light'}`}
-      style={{ background: isDark ? '#020617' : '#f1f5f9' }}
+      className="relative min-h-screen overflow-x-hidden text-slate-100"
+      style={{ background: '#020617' }}
     >
-      {/* Background blobs */}
-      {isDark ? (
-        <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-          <div className="absolute -top-60 -right-60 h-[700px] w-[700px] rounded-full bg-teal-500/[0.07] blur-[140px]" />
-          <div className="absolute top-1/3 -left-40 h-[600px] w-[600px] rounded-full bg-indigo-500/[0.07] blur-[140px]" />
-          <div className="absolute bottom-0 right-1/3 h-[500px] w-[500px] rounded-full bg-violet-500/[0.05] blur-[120px]" />
-        </div>
-      ) : (
-        <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-          <div className="absolute -top-40 -right-40 h-[600px] w-[600px] rounded-full bg-teal-300/20 blur-[120px]" />
-          <div className="absolute top-1/2 -left-40 h-[500px] w-[500px] rounded-full bg-indigo-300/20 blur-[120px]" />
-          <div className="absolute bottom-0 right-1/4 h-[400px] w-[400px] rounded-full bg-violet-300/15 blur-[100px]" />
-        </div>
-      )}
+      {/* Deep space gradient blobs */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
+        <div className="absolute -top-60 -right-60 h-[700px] w-[700px] rounded-full bg-teal-500/[0.07] blur-[140px]" />
+        <div className="absolute top-1/3 -left-40 h-[600px] w-[600px] rounded-full bg-indigo-500/[0.07] blur-[140px]" />
+        <div className="absolute bottom-0 right-1/3 h-[500px] w-[500px] rounded-full bg-violet-500/[0.05] blur-[120px]" />
+      </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
 
@@ -1484,23 +1453,9 @@ export default function AdminDashboard() {
                 )}
               </div>
               <button
-                onClick={toggleTheme}
-                title={isDark ? 'עבור לתצוגה בהירה' : 'עבור לתצוגה כהה'}
-                className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium backdrop-blur-md transition-all
-                  ${isDark
-                    ? 'border-white/10 bg-white/[0.05] text-slate-300 hover:bg-white/[0.09] hover:text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm'}`}
-              >
-                {isDark ? <Sun size={14} /> : <Moon size={14} />}
-                {isDark ? 'יום' : 'לילה'}
-              </button>
-              <button
                 onClick={fetchData}
                 disabled={loading}
-                className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium backdrop-blur-md transition-all disabled:opacity-40
-                  ${isDark
-                    ? 'border-white/10 bg-white/[0.05] text-slate-300 hover:bg-white/[0.09] hover:text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm'}`}
+                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-slate-300 backdrop-blur-md transition-all hover:bg-white/[0.09] hover:text-white disabled:opacity-40"
               >
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                 רענן
@@ -1517,10 +1472,8 @@ export default function AdminDashboard() {
                 className={`
                   rounded-xl px-1 py-2 text-xs sm:text-sm font-semibold transition-all duration-200 text-center w-full whitespace-nowrap overflow-hidden text-ellipsis
                   ${range === key
-                    ? (isDark ? 'bg-teal-500/80 text-white border border-teal-400/50' : 'bg-teal-600 text-white border border-teal-600')
-                    : (isDark
-                        ? 'border border-white/[0.08] bg-white/[0.04] text-slate-400 hover:bg-white/[0.08] hover:text-slate-200'
-                        : 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 shadow-sm')
+                    ? 'bg-teal-500/80 text-white border border-teal-400/50'
+                    : 'border border-white/[0.08] bg-white/[0.04] text-slate-400 hover:bg-white/[0.08] hover:text-slate-200'
                   }
                 `}
                 style={range === key ? { boxShadow: '0 0 18px rgba(45,212,191,0.28)' } : undefined}
@@ -1879,6 +1832,5 @@ export default function AdminDashboard() {
 
       </div>
     </main>
-    </ThemeCtx.Provider>
   );
 }
