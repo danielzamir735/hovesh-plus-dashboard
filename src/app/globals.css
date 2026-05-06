@@ -109,9 +109,12 @@ html {
   }
 }
 
-.neon-low  { animation: neon-pulse-low  2.8s ease-in-out infinite; }
-.neon-mid  { animation: neon-pulse-mid  2.4s ease-in-out infinite; }
-.neon-high { animation: neon-pulse-high 2.0s ease-in-out infinite; }
+.neon-low  { animation: neon-pulse-low  2.8s ease-in-out infinite; contain: layout style; }
+.neon-mid  { animation: neon-pulse-mid  2.4s ease-in-out infinite; contain: layout style; }
+.neon-high { animation: neon-pulse-high 2.0s ease-in-out infinite; contain: layout style; }
+
+/* Keep Recharts SVG clipped to its container */
+.recharts-wrapper svg { overflow: hidden; }
 
 /* ─── Live dot pulse ──────────────────────────────────────────────────────── */
 

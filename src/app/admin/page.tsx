@@ -574,8 +574,8 @@ function GlassCard({
       };
 
   const cardCls = isDark
-    ? `rounded-2xl border bg-white/[0.04] backdrop-blur-2xl ${pulseClass ?? ''} ${className}`
-    : `rounded-2xl border bg-white ${pulseClass ?? ''} ${className}`;
+    ? `relative rounded-2xl border bg-white/[0.04] backdrop-blur-2xl ${pulseClass ?? ''} ${className}`
+    : `relative rounded-2xl border bg-white ${pulseClass ?? ''} ${className}`;
 
   return (
     <motion.div
@@ -627,16 +627,16 @@ function StatCard({
       neonColor={neonColor}
       pulseClass={pulseClass}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-slate-400 leading-tight">{label}</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-xs font-medium text-slate-400 leading-tight truncate">{label}</span>
           {tooltip && <InfoTooltip text={tooltip} />}
         </div>
         <div className={`p-2 rounded-xl ${accentBg} shrink-0`}>
           <Icon size={15} className={accentText} />
         </div>
       </div>
-      <p className="text-3xl font-bold tracking-tight text-white">
+      <p className="text-2xl sm:text-3xl font-bold tracking-tight text-white truncate">
         {rawValue !== undefined ? (
           <AnimatedNumber value={rawValue} format={rawFormat} />
         ) : (
@@ -874,10 +874,10 @@ const DEVICE_LABELS: Record<string, string> = {
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 4;
   return (
-    <div className="flex flex-col items-center gap-0.5 w-5">
-      <span className="text-[9px] text-slate-500 tabular-nums leading-none">{value || ''}</span>
-      <div className="w-4 rounded-t" style={{ height: `${pct * 0.36}rem`, background: color, opacity: value ? 0.85 : 0.15 }} />
-    </div>
+    <div
+      className="flex-1 min-w-0 rounded-t"
+      style={{ height: `${pct * 0.36}rem`, background: color, opacity: value ? 0.85 : 0.15 }}
+    />
   );
 }
 
@@ -923,7 +923,7 @@ function RealtimePanel({ rt }: { rt: RealtimeFast }) {
         {/* 5-min timeline */}
         <div>
           <p className="text-[10px] text-slate-600 mb-2">פעילות לפי דקה (5 דק׳ אחרונות)</p>
-          <div className="flex items-end gap-1 h-16 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+          <div className="flex items-end gap-0.5 h-16 rounded-xl border border-white/[0.06] bg-white/[0.02] px-2 py-2 overflow-hidden">
             {[...timeline5min].reverse().map((t) => (
               <MiniBar key={t.minutesAgo} value={t.users} max={maxTl5} color="#34d399" />
             ))}
@@ -939,7 +939,7 @@ function RealtimePanel({ rt }: { rt: RealtimeFast }) {
         {/* 30-min timeline */}
         <div>
           <p className="text-[10px] text-slate-600 mb-2">פעילות לפי דקה (30 דק׳ אחרונות)</p>
-          <div className="flex items-end gap-px h-16 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+          <div className="flex items-end gap-px h-16 rounded-xl border border-white/[0.06] bg-white/[0.02] px-2 py-2 overflow-hidden">
             {[...timeline30min].reverse().map((t) => (
               <MiniBar key={t.minutesAgo} value={t.users} max={maxTl30} color="#2dd4bf" />
             ))}
@@ -1515,7 +1515,7 @@ export default function AdminDashboard() {
                 key={key}
                 onClick={() => setRange(key)}
                 className={`
-                  rounded-xl px-2 py-2 text-sm font-semibold transition-all duration-200 text-center w-full
+                  rounded-xl px-1 py-2 text-xs sm:text-sm font-semibold transition-all duration-200 text-center w-full whitespace-nowrap overflow-hidden text-ellipsis
                   ${range === key
                     ? (isDark ? 'bg-teal-500/80 text-white border border-teal-400/50' : 'bg-teal-600 text-white border border-teal-600')
                     : (isDark
@@ -1701,8 +1701,9 @@ export default function AdminDashboard() {
             {loading ? (
               <SkeletonBlock className="h-56" />
             ) : (
+              <div className="w-full" style={{ minHeight: 0 }}>
               <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={data?.chartData ?? []} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <AreaChart data={data?.chartData ?? []} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gSessions" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.35} />
@@ -1721,6 +1722,7 @@ export default function AdminDashboard() {
                   <Area type="monotone" dataKey="users"    stroke="#8b5cf6" strokeWidth={2} fill="url(#gUsers)"    dot={false} activeDot={{ r: 5, fill: '#8b5cf6' }} />
                 </AreaChart>
               </ResponsiveContainer>
+              </div>
             )}
 
             {!loading && (
@@ -1740,7 +1742,7 @@ export default function AdminDashboard() {
           </GlassCard>
 
           {/* Features TileGrid – 1/3 */}
-          <GlassCard index={7} className="col-span-1 p-6 flex flex-col">
+          <GlassCard index={7} className="col-span-1 p-6 flex flex-col min-h-0">
             <div className="mb-5 flex items-center gap-3">
               <div className="p-2 rounded-xl bg-amber-500/15">
                 <Zap size={17} className="text-amber-400" />
@@ -1781,8 +1783,9 @@ export default function AdminDashboard() {
             {loading ? (
               <SkeletonBlock className="h-48" />
             ) : (
+              <div className="w-full" style={{ minHeight: 0 }}>
               <ResponsiveContainer width="100%" height={190}>
-                <BarChart data={data?.hourlyData ?? []} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <BarChart data={data?.hourlyData ?? []} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 9 }} tickLine={false} axisLine={false} interval={2} />
                   <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} tickLine={false} axisLine={false} />
@@ -1797,6 +1800,7 @@ export default function AdminDashboard() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             )}
           </GlassCard>
 
