@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence, animate } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
   Activity,
@@ -62,6 +62,19 @@ interface RealtimeInteractions {
 }
 
 interface FeatureEventDetail { eventName: string; featureName: string; count: number }
+
+interface RealtimeFast {
+  activeUsers5min: number;
+  activeUsers30min: number;
+  screens5min:   { screen: string; users: number }[];
+  events5min:    { name: string; count: number }[];
+  features5min:  { name: string; count: number }[];
+  cities5min:    { city: string; users: number }[];
+  devices5min:   { device: string; users: number }[];
+  hospitals5min: { name: string; users: number }[];
+  timeline5min:  { minutesAgo: number; users: number }[];
+  timeline30min: { minutesAgo: number; users: number }[];
+}
 
 interface AnalyticsData {
   summaryStats: SummaryStats;
@@ -509,29 +522,7 @@ function AnimatedNumber({
   value: number;
   format?: (n: number) => string;
 }) {
-  const [display, setDisplay] = useState(0);
-  const [rev, setRev] = useState(0);
-
-  useEffect(() => {
-    setRev((r) => r + 1);
-    const ctrl = animate(0, value, {
-      duration: 1.4,
-      ease: 'easeOut',
-      onUpdate: (v) => setDisplay(Math.round(v)),
-    });
-    return () => ctrl.stop();
-  }, [value]);
-
-  return (
-    <motion.span
-      key={rev}
-      className="tabular-nums inline-block"
-      animate={{ scale: [1, 1.06, 1] }}
-      transition={{ duration: 0.45, times: [0, 0.28, 1], ease: 'easeOut' }}
-    >
-      {fmt(display)}
-    </motion.span>
-  );
+  return <span className="tabular-nums inline-block">{fmt(value)}</span>;
 }
 
 // ─── GlassCard ────────────────────────────────────────────────────────────────
@@ -840,6 +831,201 @@ function RankedList({
   );
 }
 
+// ─── RealtimePanel ───────────────────────────────────────────────────────────
+
+const AUTO_EVENT_NAMES = new Set([
+  'page_view','scroll','session_start','first_visit','user_engagement',
+  'click','file_download','video_start','video_progress','video_complete',
+  'first_open','app_update','os_update','notification_open',
+  'notification_receive','notification_dismiss','firebase_campaign',
+]);
+
+const DEVICE_LABELS: Record<string, string> = {
+  mobile: 'מובייל', tablet: 'טאבלט', desktop: 'מחשב',
+};
+
+function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 4;
+  return (
+    <div className="flex flex-col items-center gap-0.5 w-5">
+      <span className="text-[9px] text-slate-500 tabular-nums leading-none">{value || ''}</span>
+      <div className="w-4 rounded-t" style={{ height: `${pct * 0.36}rem`, background: color, opacity: value ? 0.85 : 0.15 }} />
+    </div>
+  );
+}
+
+function RealtimePanel({ rt }: { rt: RealtimeFast }) {
+  const { activeUsers5min, activeUsers30min, screens5min, events5min, features5min,
+          cities5min, devices5min, hospitals5min, timeline5min, timeline30min } = rt;
+
+  const maxTl5  = Math.max(...timeline5min.map(t => t.users),  1);
+  const maxTl30 = Math.max(...timeline30min.map(t => t.users), 1);
+
+  // Filter auto-events out of event list
+  const customEvents5 = events5min.filter(e => !AUTO_EVENT_NAMES.has(e.name));
+
+  return (
+    <GlassCard index={13} className="p-6" neonColor="#34d399">
+      {/* Header */}
+      <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="relative flex items-center justify-center">
+            <span className="live-ring absolute h-3 w-3 rounded-full bg-emerald-400 opacity-60" />
+            <span className="live-dot relative h-3 w-3 rounded-full bg-emerald-400" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-white text-sm">רגע זה – 5 דקות אחרונות</h2>
+            <p className="text-[11px] text-slate-500">כמו GA4 Realtime · מתעדכן כל 30 שניות</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 text-center">
+          <div>
+            <p className="text-2xl font-bold text-emerald-400 tabular-nums">{activeUsers5min}</p>
+            <p className="text-[10px] text-slate-500">פעילים 5 דק׳</p>
+          </div>
+          <div className="w-px h-8 bg-white/10" />
+          <div>
+            <p className="text-2xl font-bold text-teal-400 tabular-nums">{activeUsers30min}</p>
+            <p className="text-[10px] text-slate-500">פעילים 30 דק׳</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Timelines */}
+      <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* 5-min timeline */}
+        <div>
+          <p className="text-[10px] text-slate-600 mb-2">פעילות לפי דקה (5 דק׳ אחרונות)</p>
+          <div className="flex items-end gap-1 h-16 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+            {[...timeline5min].reverse().map((t) => (
+              <MiniBar key={t.minutesAgo} value={t.users} max={maxTl5} color="#34d399" />
+            ))}
+            {timeline5min.length === 0 && (
+              <span className="text-xs text-slate-600 m-auto">אין נתונים</span>
+            )}
+          </div>
+          <div className="flex justify-between text-[9px] text-slate-700 mt-1 px-1">
+            <span>4 דק׳ אחורה</span><span>עכשיו</span>
+          </div>
+        </div>
+
+        {/* 30-min timeline */}
+        <div>
+          <p className="text-[10px] text-slate-600 mb-2">פעילות לפי דקה (30 דק׳ אחרונות)</p>
+          <div className="flex items-end gap-px h-16 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+            {[...timeline30min].reverse().map((t) => (
+              <MiniBar key={t.minutesAgo} value={t.users} max={maxTl30} color="#2dd4bf" />
+            ))}
+            {timeline30min.length === 0 && (
+              <span className="text-xs text-slate-600 m-auto">אין נתונים</span>
+            )}
+          </div>
+          <div className="flex justify-between text-[9px] text-slate-700 mt-1 px-1">
+            <span>30 דק׳ אחורה</span><span>עכשיו</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main 3-column breakdown */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+        {/* Screens */}
+        <div>
+          <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-2">מסכים פעילים</p>
+          {screens5min.length === 0 ? (
+            <p className="text-xs text-slate-600">אין נתונים</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {screens5min.slice(0, 6).map((s) => (
+                <div key={s.screen} className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-slate-300 truncate flex-1 leading-snug">{s.screen}</span>
+                  <span className="text-xs font-bold text-emerald-400 tabular-nums shrink-0">{s.users}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Features */}
+        <div>
+          <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-2">פיצ׳רים בשימוש</p>
+          {features5min.length === 0 ? (
+            <p className="text-xs text-slate-600">אין אינטראקציות</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {features5min.slice(0, 6).map((f) => (
+                <div key={f.name} className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-slate-300 truncate flex-1 leading-snug">{hebrewEvent(f.name)}</span>
+                  <span className="text-xs font-bold text-amber-400 tabular-nums shrink-0">{f.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Events */}
+        <div>
+          <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-2">אירועים (ללא אוטו)</p>
+          {customEvents5.length === 0 ? (
+            <p className="text-xs text-slate-600">אין אירועים</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {customEvents5.slice(0, 6).map((e) => (
+                <div key={e.name} className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-slate-300 truncate flex-1 leading-snug">{hebrewEvent(e.name)}</span>
+                  <span className="text-xs font-bold text-violet-400 tabular-nums shrink-0">{e.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom strip: cities + devices + hospitals */}
+      {(cities5min.length > 0 || devices5min.length > 0 || hospitals5min.length > 0) && (
+        <div className="mt-4 pt-4 border-t border-white/[0.06] flex flex-wrap gap-4">
+
+          {cities5min.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] text-slate-600 shrink-0">ערים:</span>
+              {cities5min.map((c) => (
+                <span key={c.city} className="flex items-center gap-1 rounded-lg border border-teal-400/20 bg-teal-400/[0.06] px-2 py-0.5 text-[11px]">
+                  <span className="font-semibold text-teal-400">{c.users}</span>
+                  <span className="text-slate-400">{hebrewCity(c.city)}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {devices5min.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] text-slate-600 shrink-0">מכשירים:</span>
+              {devices5min.map((d) => (
+                <span key={d.device} className="flex items-center gap-1 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2 py-0.5 text-[11px]">
+                  <span className="font-semibold text-sky-400">{d.users}</span>
+                  <span className="text-slate-400">{DEVICE_LABELS[d.device] ?? d.device}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {hospitals5min.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] text-slate-600 shrink-0">ב״ח:</span>
+              {hospitals5min.map((h) => (
+                <span key={h.name} className="flex items-center gap-1 rounded-lg border border-rose-400/20 bg-rose-400/[0.06] px-2 py-0.5 text-[11px]">
+                  <span className="font-semibold text-rose-400">{h.users}</span>
+                  <span className="text-slate-400">{h.name}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </GlassCard>
+  );
+}
+
 // ─── Live Feed ────────────────────────────────────────────────────────────────
 
 function LiveFeed({
@@ -1021,7 +1207,13 @@ export default function AdminDashboard() {
   const [customEnd,    setCustomEnd]    = useState('');
   const [sheetRowCount, setSheetRowCount] = useState(0);
   const [sheetsBadge,   setSheetsBadge]  = useState(false);
-  const [realtimeFast, setRealtimeFast] = useState({ activeUsers5min: 0, activeUsers30min: 0 });
+  const [realtimeFast, setRealtimeFast] = useState<RealtimeFast>({
+    activeUsers5min: 0,
+    activeUsers30min: 0,
+    screens5min: [], events5min: [], features5min: [],
+    cities5min: [], devices5min: [], hospitals5min: [],
+    timeline5min: [], timeline30min: [],
+  });
 
   const fetchData = useCallback(async () => {
     if (range === 'custom' && (!customStart || !customEnd)) return;
@@ -1075,6 +1267,14 @@ export default function AdminDashboard() {
         setRealtimeFast({
           activeUsers5min:  json.activeUsers5min  ?? 0,
           activeUsers30min: json.activeUsers30min ?? 0,
+          screens5min:   json.screens5min   ?? [],
+          events5min:    json.events5min    ?? [],
+          features5min:  json.features5min  ?? [],
+          cities5min:    json.cities5min    ?? [],
+          devices5min:   json.devices5min   ?? [],
+          hospitals5min: json.hospitals5min ?? [],
+          timeline5min:  json.timeline5min  ?? [],
+          timeline30min: json.timeline30min ?? [],
         });
       } catch {}
     }
@@ -1371,7 +1571,12 @@ export default function AdminDashboard() {
           )}
         </section>
 
-        {/* ── Live Feed ── */}
+        {/* ── Realtime 5-min Panel ── */}
+        <div className="mb-6">
+          <RealtimePanel rt={realtimeFast} />
+        </div>
+
+        {/* ── Live Feed (30-min breakdown) ── */}
         <div className="mb-6">
           <LiveFeed data={data} loading={loading} liveUsers={liveUsers} live5min={live5min} />
         </div>
