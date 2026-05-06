@@ -866,22 +866,9 @@ const DEVICE_LABELS: Record<string, string> = {
   mobile: 'מובייל', tablet: 'טאבלט', desktop: 'מחשב',
 };
 
-function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 4;
-  return (
-    <div
-      className="flex-1 min-w-0 rounded-t"
-      style={{ height: `${pct * 0.36}rem`, background: color, opacity: value ? 0.85 : 0.15 }}
-    />
-  );
-}
-
 function RealtimePanel({ rt }: { rt: RealtimeFast }) {
   const { activeUsers5min, activeUsers30min, screens5min, events5min, features5min,
-          cities5min, devices5min, hospitals5min, timeline5min, timeline30min } = rt;
-
-  const maxTl5  = Math.max(...timeline5min.map(t => t.users),  1);
-  const maxTl30 = Math.max(...timeline30min.map(t => t.users), 1);
+          cities5min, devices5min, hospitals5min } = rt;
 
   // Filter auto-events out of event list
   const customEvents5 = events5min.filter(e => !AUTO_EVENT_NAMES.has(e.name));
@@ -909,41 +896,6 @@ function RealtimePanel({ rt }: { rt: RealtimeFast }) {
           <div>
             <p className="text-2xl font-bold text-teal-400 tabular-nums">{activeUsers30min}</p>
             <p className="text-[10px] text-slate-500">פעילים 30 דק׳</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Timelines */}
-      <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* 5-min timeline */}
-        <div>
-          <p className="text-[10px] text-slate-600 mb-2">פעילות לפי דקה (5 דק׳ אחרונות)</p>
-          <div className="flex items-end gap-0.5 h-16 rounded-xl border border-white/[0.06] bg-white/[0.02] px-2 py-2 overflow-hidden">
-            {[...timeline5min].reverse().map((t) => (
-              <MiniBar key={t.minutesAgo} value={t.users} max={maxTl5} color="#34d399" />
-            ))}
-            {timeline5min.length === 0 && (
-              <span className="text-xs text-slate-600 m-auto">אין נתונים</span>
-            )}
-          </div>
-          <div className="flex justify-between text-[9px] text-slate-700 mt-1 px-1">
-            <span>4 דק׳ אחורה</span><span>עכשיו</span>
-          </div>
-        </div>
-
-        {/* 30-min timeline */}
-        <div>
-          <p className="text-[10px] text-slate-600 mb-2">פעילות לפי דקה (30 דק׳ אחרונות)</p>
-          <div className="flex items-end gap-px h-16 rounded-xl border border-white/[0.06] bg-white/[0.02] px-2 py-2 overflow-hidden">
-            {[...timeline30min].reverse().map((t) => (
-              <MiniBar key={t.minutesAgo} value={t.users} max={maxTl30} color="#2dd4bf" />
-            ))}
-            {timeline30min.length === 0 && (
-              <span className="text-xs text-slate-600 m-auto">אין נתונים</span>
-            )}
-          </div>
-          <div className="flex justify-between text-[9px] text-slate-700 mt-1 px-1">
-            <span>30 דק׳ אחורה</span><span>עכשיו</span>
           </div>
         </div>
       </div>
