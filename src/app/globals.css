@@ -134,3 +134,61 @@ html {
 .live-ring {
   animation: ring-pulse 1.4s ease-out infinite;
 }
+
+/* ─── Light theme ─────────────────────────────────────────────────────────── */
+
+.dashboard-light {
+  color-scheme: light;
+}
+
+/* Scroll bar */
+.dashboard-light ::-webkit-scrollbar-track  { background: rgba(0,0,0,0.03); }
+.dashboard-light ::-webkit-scrollbar-thumb  { background: rgba(0,0,0,0.12); }
+.dashboard-light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
+
+/* Generic slate text → readable on white */
+.dashboard-light .text-white,
+.dashboard-light .text-slate-100 { color: #0f172a !important; }
+.dashboard-light .text-slate-200,
+.dashboard-light .text-slate-300 { color: #334155 !important; }
+.dashboard-light .text-slate-400 { color: #64748b !important; }
+.dashboard-light .text-slate-500,
+.dashboard-light .text-slate-600,
+.dashboard-light .text-slate-700 { color: #94a3b8 !important; }
+
+/* Accent colours — step from *-400 to *-600 so they stay readable on white */
+.dashboard-light [class*="text-emerald-4"] { color: #059669 !important; }
+.dashboard-light [class*="text-teal-4"]    { color: #0d9488 !important; }
+.dashboard-light [class*="text-indigo-4"]  { color: #4f46e5 !important; }
+.dashboard-light [class*="text-violet-4"]  { color: #7c3aed !important; }
+.dashboard-light [class*="text-sky-4"]     { color: #0284c7 !important; }
+.dashboard-light [class*="text-amber-4"]   { color: #d97706 !important; }
+.dashboard-light [class*="text-rose-4"]    { color: #e11d48 !important; }
+.dashboard-light [class*="text-pink-4"]    { color: #db2777 !important; }
+.dashboard-light [class*="text-cyan-4"]    { color: #0891b2 !important; }
+
+/* Neon glows → plain shadow in light mode */
+.dashboard-light .neon-low,
+.dashboard-light .neon-mid,
+.dashboard-light .neon-high {
+  animation: none !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04) !important;
+}
+
+/* Shimmer on light background */
+.dashboard-light .shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(0,0,0,0.03) 25%,
+    rgba(0,0,0,0.07) 50%,
+    rgba(0,0,0,0.03) 75%
+  );
+  background-size: 400% 100%;
+}
+
+/* Range picker active button */
+.dashboard-light .range-active {
+  background: #0d9488 !important;
+  border-color: #0d9488 !important;
+  color: #ffffff !important;
+}
