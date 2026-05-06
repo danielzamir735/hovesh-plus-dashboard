@@ -1261,35 +1261,68 @@ export default function AdminDashboard() {
     if (range === 'custom' && (!customStart || !customEnd)) return;
     setLoading(true);
     setError(null);
-    try {
-      const params = new URLSearchParams({ range });
-      if (range === 'custom') {
-        params.set('startDate', customStart);
-        params.set('endDate',   customEnd);
-      }
-      const res = await fetch(`/api/analytics?${params}`, { cache: 'no-store' });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `שגיאת שרת: ${res.status}`);
-      }
-      const json: AnalyticsData = await res.json();
-      setData({
-        ...json,
-        todayActiveUsers: json.todayActiveUsers ?? 0,
-        activeUsers5min:  json.activeUsers5min  ?? 0,
-        featureEventsDetail: json.featureEventsDetail ?? [],
-        realtimeInteractions: json.realtimeInteractions ?? {
-          byCategory: { calculators: 0, medical_knowledge: 0, tools: 0, emergency_info: 0 },
-          byFeature: [],
-          hospitalData: [],
-        },
-      });
-      setLastUpdated(new Date());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'שגיאה לא ידועה');
-    } finally {
-      setLoading(false);
+
+    const params = new URLSearchParams({ range });
+    if (range === 'custom') {
+      params.set('startDate', customStart);
+      params.set('endDate',   customEnd);
     }
+    const url = `/api/analytics?${params}`;
+
+    const RETRIES    = 3;
+    const TIMEOUT_MS = 25_000;
+    let lastErr: Error | null = null;
+
+    for (let attempt = 1; attempt <= RETRIES; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      try {
+        const res = await fetch(url, {
+          cache:     'no-store',
+          signal:    controller.signal,
+          keepalive: true,
+        });
+        clearTimeout(timer);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? `שגיאת שרת: ${res.status}`);
+        }
+        const json: AnalyticsData = await res.json();
+        setData({
+          ...json,
+          todayActiveUsers: json.todayActiveUsers ?? 0,
+          activeUsers5min:  json.activeUsers5min  ?? 0,
+          featureEventsDetail: json.featureEventsDetail ?? [],
+          realtimeInteractions: json.realtimeInteractions ?? {
+            byCategory: { calculators: 0, medical_knowledge: 0, tools: 0, emergency_info: 0 },
+            byFeature: [],
+            hospitalData: [],
+          },
+        });
+        setLastUpdated(new Date());
+        setLoading(false);
+        return;
+      } catch (e) {
+        clearTimeout(timer);
+        const isAbort   = e instanceof Error && e.name === 'AbortError';
+        const isNetwork = e instanceof TypeError; // "Failed to fetch" / status-0
+        console.error(`[analytics] fetch attempt ${attempt}/${RETRIES} failed`, { url, error: e });
+        lastErr = isAbort
+          ? new Error('הבקשה נקטעה בשל timeout – הנתונים יתרעננו אוטומטית')
+          : e instanceof Error
+          ? e
+          : new Error('שגיאה לא ידועה');
+        // Only retry on transient network errors (TypeError); give up on timeout or server errors
+        if (isNetwork && attempt < RETRIES) {
+          await new Promise<void>((r) => setTimeout(r, attempt * 2_000));
+        } else {
+          break;
+        }
+      }
+    }
+
+    setError(lastErr?.message ?? 'שגיאה לא ידועה');
+    setLoading(false);
   }, [range, customStart, customEnd]);
 
   useEffect(() => {

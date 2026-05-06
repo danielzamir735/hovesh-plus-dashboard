@@ -1,6 +1,9 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { NextResponse } from 'next/server';
 
+export const dynamic     = 'force-dynamic';
+export const maxDuration = 30; // Vercel: allow up to 30s for 10 parallel realtime queries
+
 function buildClient() {
   const privateKey = process.env.GA_PRIVATE_KEY!
     .trim()

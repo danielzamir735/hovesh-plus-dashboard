@@ -1,6 +1,9 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic     = 'force-dynamic';
+export const maxDuration = 60; // Vercel: allow up to 60s for 15 parallel GA4 queries
+
 const AUTO_EVENTS = [
   'page_view', 'scroll', 'session_start', 'first_visit',
   'user_engagement', 'click', 'file_download', 'video_start',
