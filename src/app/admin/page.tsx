@@ -552,14 +552,14 @@ function GlassCard({
 }) {
   const baseStyle: React.CSSProperties = neonColor
     ? {
-        borderColor: neonColor + '28',
-        boxShadow: `0 0 60px ${neonColor}12, 0 16px 60px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.07)`,
+        borderColor: neonColor + '30',
+        boxShadow: `0 0 0 1px ${neonColor}10, 0 0 60px ${neonColor}08, 0 2px 0 ${neonColor}20 inset`,
         '--neon': neonColor,
         ...extStyle,
       } as React.CSSProperties
     : {
-        borderColor: 'rgba(255,255,255,0.10)',
-        boxShadow: '0 16px 60px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.04)',
         ...extStyle,
       };
 
@@ -569,10 +569,63 @@ function GlassCard({
       variants={fadeUp}
       initial="hidden"
       animate="visible"
-      className={`relative rounded-3xl border bg-black/40 backdrop-blur-3xl ${pulseClass ?? ''} ${className}`}
-      style={baseStyle}
+      className={`relative rounded-2xl border ${pulseClass ?? ''} ${className}`}
+      style={{ background: '#0c0c0c', ...baseStyle }}
     >
       {children}
+    </motion.div>
+  );
+}
+
+// ─── HeroStats ────────────────────────────────────────────────────────────────
+
+function HeroStats({
+  todayUsers,
+  live5min,
+  liveUsers,
+}: {
+  todayUsers: number;
+  live5min: number;
+  liveUsers: number;
+}) {
+  const items = [
+    { label: 'פעילים היום',   sub: 'מחצות · שעון ישראל',  value: todayUsers, color: '#00e5ff' },
+    { label: 'פעילים עכשיו', sub: '5 דקות אחרונות',       value: live5min,   color: '#00ff88' },
+    { label: 'פעילים 30 דק׳', sub: 'חצי שעה אחרונה',     value: liveUsers,  color: '#bf5fff' },
+  ];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="mb-6 rounded-2xl border overflow-hidden"
+      style={{
+        borderColor: 'rgba(0,229,255,0.18)',
+        background: '#050505',
+        boxShadow: '0 0 80px rgba(0,229,255,0.05), inset 0 1px 0 rgba(0,229,255,0.12)',
+      }}
+    >
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.07]">
+        {items.map((item) => (
+          <div key={item.label} className="px-8 py-7 flex flex-col gap-2">
+            <p
+              className="text-[10px] font-mono font-black uppercase tracking-[0.28em]"
+              style={{ color: item.color }}
+            >
+              {item.label}
+            </p>
+            <p
+              className="text-6xl sm:text-7xl font-black text-white tracking-tighter leading-none tabular-nums"
+              style={{ textShadow: `0 0 40px ${item.color}60` }}
+            >
+              {formatNumber(item.value)}
+            </p>
+            <p className="text-[10px] text-slate-700 font-mono uppercase tracking-[0.18em]">
+              {item.sub}
+            </p>
+          </div>
+        ))}
+      </div>
     </motion.div>
   );
 }
@@ -654,43 +707,34 @@ function StatCard({
   return (
     <GlassCard
       index={index}
-      className="p-5 flex flex-col overflow-hidden hover:bg-white/[0.03] transition-all duration-300 group"
+      className="p-5 flex flex-col overflow-hidden transition-all duration-200 hover:border-white/20"
       neonColor={neonColor}
       pulseClass={pulseClass}
     >
-      {/* Accent glow at top edge */}
+      {/* Right-edge neon accent bar (visual start in RTL) */}
       <div
-        className="absolute top-0 inset-x-0 h-px pointer-events-none"
-        style={{
-          background: neonColor
-            ? `linear-gradient(90deg, transparent, ${neonColor}90, transparent)`
-            : 'transparent',
-        }}
+        className="absolute top-0 right-0 w-0.5 h-full pointer-events-none"
+        style={{ background: neonColor ? `linear-gradient(180deg, ${neonColor}80, ${neonColor}20, transparent)` : 'transparent' }}
       />
-      {/* Ambient glow blob at bottom */}
+      {/* Glow */}
       {neonColor && (
         <div
-          className="absolute -bottom-12 -right-12 w-40 h-40 rounded-full blur-3xl pointer-events-none"
-          style={{ background: neonColor, opacity: 0.10 }}
+          className="absolute -bottom-10 -right-10 w-36 h-36 rounded-full blur-3xl pointer-events-none"
+          style={{ background: neonColor, opacity: 0.07 }}
         />
       )}
-      {/* Icon row */}
-      <div className="flex items-center justify-between mb-4 relative z-10">
-        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${accentBg}`}>
-          <Icon size={18} className={accentText} />
-        </div>
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </div>
       {/* Big number */}
-      <p className="text-4xl sm:text-5xl font-black text-white tracking-tighter leading-none relative z-10">
+      <p className="text-3xl sm:text-4xl font-black text-white tracking-tighter leading-none relative z-10 mt-1">
         {displayValue}
       </p>
-      {/* Label */}
-      <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-600 relative z-10">
-        {label}
-      </p>
+      {/* Icon + label row */}
+      <div className="flex items-center gap-2 mt-4 relative z-10">
+        <Icon size={13} style={{ color: neonColor ?? 'rgba(255,255,255,0.35)' }} />
+        <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-600 truncate">{label}</p>
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </div>
       {sub && (
-        <p className="text-[10px] text-slate-700 mt-0.5 relative z-10 leading-tight">{sub}</p>
+        <p className="text-[10px] text-slate-800 mt-0.5 relative z-10 font-mono leading-tight">{sub}</p>
       )}
     </GlassCard>
   );
@@ -1437,13 +1481,13 @@ export default function AdminDashboard() {
     <main
       dir="rtl"
       className="relative min-h-screen overflow-x-hidden text-slate-100"
-      style={{ background: '#080608' }}
+      style={{ background: '#000000' }}
     >
       {/* Atmosphere */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-        <div className="absolute -top-60 right-0 h-[800px] w-[800px] rounded-full bg-amber-500/[0.07] blur-[200px]" />
-        <div className="absolute top-1/3 -left-60 h-[700px] w-[700px] rounded-full bg-violet-700/[0.08] blur-[180px]" />
-        <div className="absolute -bottom-40 right-1/2 h-[600px] w-[600px] rounded-full bg-orange-600/[0.05] blur-[160px]" />
+        <div className="absolute -top-80 -right-80 h-[900px] w-[900px] rounded-full blur-[220px]" style={{ background: 'rgba(0,229,255,0.06)' }} />
+        <div className="absolute top-1/2 -left-60 h-[700px] w-[700px] rounded-full blur-[200px]" style={{ background: 'rgba(191,95,255,0.06)' }} />
+        <div className="absolute -bottom-60 right-1/3 h-[600px] w-[600px] rounded-full blur-[180px]" style={{ background: 'rgba(0,255,136,0.04)' }} />
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
@@ -1452,23 +1496,37 @@ export default function AdminDashboard() {
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5 }}
           className="mb-8"
         >
-          {/* Top row: live badge + controls */}
-          <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-1.5">
-                <span className="live-dot h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
-                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-500">Live</span>
-              </div>
-              {lastUpdated && (
-                <span className="text-[11px] text-slate-700 hidden sm:block font-mono">
-                  {lastUpdated.toLocaleTimeString('he-IL')}
+          {/* Top bar: title + controls */}
+          <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
+            <div>
+              <h1
+                className="text-7xl sm:text-8xl font-black tracking-tighter leading-none"
+                style={{ letterSpacing: '-0.04em' }}
+              >
+                <span className="text-white">חובש</span>
+                <span
+                  style={{
+                    color: '#00e5ff',
+                    textShadow: '0 0 30px rgba(0,229,255,0.9), 0 0 80px rgba(0,229,255,0.4)',
+                  }}
+                >+</span>
+              </h1>
+              <div className="mt-2 flex items-center gap-3">
+                <span className="live-dot h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span className="text-[10px] font-mono font-bold uppercase tracking-[0.28em] text-slate-600">
+                  GA4 Real-Time Dashboard
                 </span>
-              )}
+                {lastUpdated && (
+                  <span className="text-[10px] font-mono text-slate-800 hidden sm:block">
+                    · {lastUpdated.toLocaleTimeString('he-IL')}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mt-3">
               <div className="relative">
                 <a
                   href="https://docs.google.com/spreadsheets/d/1DiNuIOnOhrMU1GVbPrCd5s2XcIRvPnvIpfiyQnouS28/edit?resourcekey=&gid=893573067#gid=893573067"
@@ -1478,61 +1536,46 @@ export default function AdminDashboard() {
                     localStorage.setItem('last_seen_count', sheetRowCount.toString());
                     setSheetsBadge(false);
                   }}
-                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-slate-400 backdrop-blur-md transition-all hover:bg-white/[0.10] hover:text-white"
+                  className="flex items-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.04] px-4 py-2 text-xs font-mono font-bold text-slate-500 transition-all hover:border-cyan-400/30 hover:text-cyan-400"
                 >
-                  <ExternalLink size={14} />
+                  <ExternalLink size={13} />
                   ערוץ
                 </a>
                 {sheetsBadge && (
-                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-black animate-pulse" />
+                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 border border-black animate-pulse" />
                 )}
               </div>
               <button
                 onClick={fetchData}
                 disabled={loading}
-                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-slate-400 backdrop-blur-md transition-all hover:bg-amber-500/[0.12] hover:border-amber-500/30 hover:text-amber-400 disabled:opacity-40"
+                className="flex items-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.04] px-4 py-2 text-xs font-mono font-bold text-slate-500 transition-all hover:border-cyan-400/30 hover:text-cyan-400 disabled:opacity-30"
               >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
                 רענן
               </button>
             </div>
           </div>
 
-          {/* Massive title */}
-          <div className="mb-5">
-            <h1 className="text-6xl sm:text-7xl font-black tracking-tighter leading-none">
-              <span className="text-white">חובש</span>
-              <span
-                style={{
-                  background: 'linear-gradient(125deg, #eab308 0%, #f97316 60%, #ef4444 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  filter: 'drop-shadow(0 0 30px rgba(234,179,8,0.4))',
-                }}
-              >+</span>
-            </h1>
-            <p className="mt-1.5 text-[11px] font-bold uppercase tracking-[0.25em] text-slate-700">
-              GA4 · Real-Time Analytics Dashboard
-            </p>
-          </div>
+          {/* Neon divider */}
+          <div
+            className="mb-5 h-px"
+            style={{ background: 'linear-gradient(90deg, rgba(0,229,255,0.6), rgba(0,229,255,0.1) 50%, transparent)' }}
+          />
 
-          {/* Gold accent divider */}
-          <div className="mb-4 h-px bg-gradient-to-r from-amber-500/40 via-amber-500/10 to-transparent" />
-
-          {/* Time Range Picker — pill container */}
-          <div className="flex items-stretch gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+          {/* Time Range Picker */}
+          <div className="flex items-stretch gap-1 p-1 rounded-xl border border-white/[0.06] bg-white/[0.02]">
             {RANGES.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setRange(key)}
-                className={`flex-1 rounded-xl py-2 text-xs font-bold transition-all duration-200 text-center whitespace-nowrap overflow-hidden text-ellipsis
-                  ${range === key
-                    ? 'bg-amber-500 text-black shadow-lg'
-                    : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.06]'
-                  }`}
-                style={range === key ? { boxShadow: '0 0 24px rgba(234,179,8,0.45)' } : undefined}
+                className={`flex-1 rounded-lg py-2 text-[11px] font-mono font-bold uppercase transition-all duration-150 text-center whitespace-nowrap overflow-hidden text-ellipsis tracking-wider
+                  ${range === key ? 'text-black' : 'text-slate-600 hover:text-slate-300'}`}
+                style={range === key ? {
+                  background: '#00e5ff',
+                  boxShadow: '0 0 20px rgba(0,229,255,0.5)',
+                } : undefined}
               >
-                {key === 'custom' && <CalendarDays size={11} className="inline mr-0.5 mb-0.5" />}
+                {key === 'custom' && <CalendarDays size={10} className="inline mr-0.5 mb-0.5" />}
                 {label}
               </button>
             ))}
@@ -1592,47 +1635,19 @@ export default function AdminDashboard() {
           )}
         </AnimatePresence>
 
-        {/* ── Bento Stat Cards ── */}
-        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
+        {/* ── Hero Metrics Strip ── */}
+        {loading ? (
+          <SkeletonBlock className="mb-6 h-52" />
+        ) : (
+          <HeroStats todayUsers={todayUsers} live5min={live5min} liveUsers={liveUsers} />
+        )}
+
+        {/* ── Secondary Stats (4 cards) ── */}
+        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {loading ? (
-            Array.from({ length: 7 }).map((_, i) => <SkeletonCard key={i} />)
+            Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
           ) : (
             <>
-              <StatCard
-                index={0}
-                icon={Users}
-                label="סה״כ היום"
-                rawValue={todayUsers}
-                sub="ממידנוח (שעון ישראל)"
-                accentBg="bg-amber-500/20"
-                accentText="text-amber-400"
-                neonColor="#eab308"
-                tooltip="משתמשים ייחודיים (לפי מזהה מכשיר) שהיו פעילים מאז 00:00 שעון ישראל. לעולם לא יהיה נמוך ממספר הפעילים ב-30 דקות."
-              />
-              <StatCard
-                index={1}
-                icon={Activity}
-                label="פעילים – 5 דק׳"
-                rawValue={live5min}
-                sub="5 דקות אחרונות"
-                accentBg="bg-emerald-500/20"
-                accentText="text-emerald-400"
-                neonColor="#34d399"
-                pulseClass={pulse5min}
-                tooltip="משתמשים ייחודיים שביצעו פעולה כלשהי ב-5 הדקות האחרונות. מתעדכן כל 30 שניות."
-              />
-              <StatCard
-                index={2}
-                icon={Activity}
-                label="פעילים – 30 דק׳"
-                rawValue={liveUsers}
-                sub="חצי שעה אחרונה"
-                accentBg="bg-teal-500/20"
-                accentText="text-teal-400"
-                neonColor="#2dd4bf"
-                pulseClass={livePulse}
-                tooltip="משתמשים ייחודיים שביצעו פעולה כלשהי ב-30 הדקות האחרונות. מתעדכן כל 30 שניות."
-              />
               <StatCard
                 index={3}
                 icon={TrendingUp}
@@ -1641,7 +1656,7 @@ export default function AdminDashboard() {
                 sub={rangeSubLabel(range)}
                 accentBg="bg-violet-500/20"
                 accentText="text-violet-400"
-                neonColor="#a78bfa"
+                neonColor="#bf5fff"
                 tooltip="מספר הסשנים הכולל — משתמש אחד יכול לפתוח כמה סשנים. אינו זהה למספר המשתמשים הייחודיים."
               />
               <StatCard
@@ -1652,7 +1667,7 @@ export default function AdminDashboard() {
                 sub="first_open בטווח זה"
                 accentBg="bg-orange-500/20"
                 accentText="text-orange-400"
-                neonColor="#fb923c"
+                neonColor="#ff9500"
                 pulseClass={newPulse}
                 tooltip="מכשירים שפתחו את האפליקציה לראשונה (אירוע first_open). מייצג התקנות חדשות בטווח הנבחר."
               />
@@ -1665,7 +1680,7 @@ export default function AdminDashboard() {
                 sub="דקות:שניות לסשן"
                 accentBg="bg-pink-500/20"
                 accentText="text-pink-400"
-                neonColor="#ec4899"
+                neonColor="#ff006e"
               />
               <StatCard
                 index={6}
@@ -1673,9 +1688,9 @@ export default function AdminDashboard() {
                 label='סה"כ התקנות'
                 rawValue={data?.totalInstalls ?? 0}
                 sub="מאז הפעלת האפליקציה"
-                accentBg="bg-rose-500/20"
-                accentText="text-rose-400"
-                neonColor="#f43f5e"
+                accentBg="bg-cyan-500/20"
+                accentText="text-cyan-400"
+                neonColor="#00e5ff"
                 tooltip="סך כל המכשירים שהתקינו את האפליקציה מאז ינואר 2023 (אירוע newUsers מצטבר)."
               />
             </>
