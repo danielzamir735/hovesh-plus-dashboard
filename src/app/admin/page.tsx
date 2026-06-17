@@ -552,14 +552,14 @@ function GlassCard({
 }) {
   const baseStyle: React.CSSProperties = neonColor
     ? {
-        borderColor: neonColor + '22',
-        boxShadow: `0 0 40px ${neonColor}10, 0 8px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.09)`,
+        borderColor: neonColor + '28',
+        boxShadow: `0 0 60px ${neonColor}12, 0 16px 60px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.07)`,
         '--neon': neonColor,
         ...extStyle,
       } as React.CSSProperties
     : {
-        borderColor: 'rgba(255,255,255,0.09)',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)',
+        borderColor: 'rgba(255,255,255,0.10)',
+        boxShadow: '0 16px 60px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.06)',
         ...extStyle,
       };
 
@@ -569,11 +569,52 @@ function GlassCard({
       variants={fadeUp}
       initial="hidden"
       animate="visible"
-      className={`relative rounded-2xl border bg-gradient-to-br from-white/[0.06] via-white/[0.03] to-transparent backdrop-blur-2xl ${pulseClass ?? ''} ${className}`}
+      className={`relative rounded-3xl border bg-black/40 backdrop-blur-3xl ${pulseClass ?? ''} ${className}`}
       style={baseStyle}
     >
       {children}
     </motion.div>
+  );
+}
+
+// ─── ActivityRing ─────────────────────────────────────────────────────────────
+
+function ActivityRing({
+  value,
+  max,
+  color,
+  size = 92,
+  strokeWidth = 7,
+  label,
+}: {
+  value: number;
+  max: number;
+  color: string;
+  size?: number;
+  strokeWidth?: number;
+  label?: string;
+}) {
+  const r = (size - strokeWidth) / 2;
+  const circ = 2 * Math.PI * r;
+  const pct = max > 0 ? Math.min(value / max, 1) : 0;
+  return (
+    <div className="relative inline-flex flex-col items-center gap-1.5">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="absolute inset-0" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
+          <circle
+            cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={strokeWidth}
+            strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)}
+            strokeLinecap="round"
+            style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+          <span className="text-2xl font-black text-white tabular-nums leading-none">{formatNumber(value)}</span>
+          {label && <span className="text-[9px] uppercase tracking-widest font-bold" style={{ color }}>{label}</span>}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -613,32 +654,43 @@ function StatCard({
   return (
     <GlassCard
       index={index}
-      className="p-5 flex flex-col gap-2 hover:bg-white/[0.03] transition-colors duration-300 overflow-hidden"
+      className="p-5 flex flex-col overflow-hidden hover:bg-white/[0.03] transition-all duration-300 group"
       neonColor={neonColor}
       pulseClass={pulseClass}
     >
+      {/* Accent glow at top edge */}
+      <div
+        className="absolute top-0 inset-x-0 h-px pointer-events-none"
+        style={{
+          background: neonColor
+            ? `linear-gradient(90deg, transparent, ${neonColor}90, transparent)`
+            : 'transparent',
+        }}
+      />
+      {/* Ambient glow blob at bottom */}
       {neonColor && (
         <div
-          className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full blur-3xl pointer-events-none"
-          style={{ background: neonColor, opacity: 0.07 }}
+          className="absolute -bottom-12 -right-12 w-40 h-40 rounded-full blur-3xl pointer-events-none"
+          style={{ background: neonColor, opacity: 0.10 }}
         />
       )}
-      <div className="flex items-start justify-between gap-2 relative z-10">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 leading-tight truncate">
-            {label}
-          </span>
-          {tooltip && <InfoTooltip text={tooltip} />}
+      {/* Icon row */}
+      <div className="flex items-center justify-between mb-4 relative z-10">
+        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${accentBg}`}>
+          <Icon size={18} className={accentText} />
         </div>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${accentBg} ring-1 ring-white/10 shrink-0`}>
-          <Icon size={13} className={accentText} />
-        </div>
+        {tooltip && <InfoTooltip text={tooltip} />}
       </div>
-      <p className="text-3xl sm:text-4xl font-black tracking-tight text-white relative z-10 leading-none mt-1">
+      {/* Big number */}
+      <p className="text-4xl sm:text-5xl font-black text-white tracking-tighter leading-none relative z-10">
         {displayValue}
       </p>
+      {/* Label */}
+      <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-600 relative z-10">
+        {label}
+      </p>
       {sub && (
-        <p className="text-[11px] text-slate-600 relative z-10 mt-auto">{sub}</p>
+        <p className="text-[10px] text-slate-700 mt-0.5 relative z-10 leading-tight">{sub}</p>
       )}
     </GlassCard>
   );
@@ -679,13 +731,10 @@ function BarTooltip({ active, payload, label }: any) {
 
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 overflow-hidden relative">
+    <div className="rounded-3xl border border-white/[0.08] bg-black/40 p-5 overflow-hidden relative" style={{ boxShadow: '0 16px 60px rgba(0,0,0,0.6)' }}>
       <div className="absolute inset-0 shimmer" />
-      <div className="relative flex justify-between mb-4">
-        <div className="h-3 w-20 rounded-lg bg-white/[0.06]" />
-        <div className="h-7 w-7 rounded-xl bg-white/[0.06]" />
-      </div>
-      <div className="relative h-8 w-28 rounded-lg bg-white/[0.06] mb-2" />
+      <div className="relative h-10 w-10 rounded-2xl bg-white/[0.06] mb-4" />
+      <div className="relative h-10 w-24 rounded-xl bg-white/[0.06] mb-3" />
       <div className="relative h-2.5 w-16 rounded-lg bg-white/[0.06]" />
     </div>
   );
@@ -693,7 +742,7 @@ function SkeletonCard() {
 
 function SkeletonBlock({ className = '' }: { className?: string }) {
   return (
-    <div className={`rounded-xl overflow-hidden relative bg-white/[0.03] border border-white/[0.05] ${className}`}>
+    <div className={`rounded-2xl overflow-hidden relative bg-black/30 border border-white/[0.07] ${className}`}>
       <div className="absolute inset-0 shimmer" />
     </div>
   );
@@ -754,7 +803,7 @@ function TileGrid({
             variants={fadeUp}
             initial="hidden"
             animate="visible"
-            className={`rounded-xl border p-3 flex flex-col items-center gap-1.5 text-center min-h-[5rem] justify-center transition-all duration-300 ${tileClass}`}
+            className={`rounded-2xl border p-3 flex flex-col items-center gap-1.5 text-center min-h-[5rem] justify-center transition-all duration-300 ${tileClass}`}
           >
             <span
               className="text-lg font-bold tabular-nums leading-tight"
@@ -822,7 +871,7 @@ function RankedList({
               initial="hidden"
               animate="visible"
               exit={{ opacity: 0, y: -4 }}
-              className="relative rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-3 overflow-hidden hover:bg-white/[0.06] transition-colors duration-200"
+              className="relative rounded-2xl border border-white/[0.08] bg-black/30 px-4 py-3 overflow-hidden hover:bg-white/[0.05] transition-colors duration-200"
             >
               <div
                 className="absolute inset-y-0 right-0 transition-all duration-500 rounded-r-xl"
@@ -872,26 +921,36 @@ function RealtimePanel({ rt }: { rt: RealtimeFast }) {
   return (
     <GlassCard index={13} className="p-6" neonColor="#34d399">
       {/* Header */}
-      <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
+      <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <div className="relative flex items-center justify-center">
             <span className="live-ring absolute h-3 w-3 rounded-full bg-emerald-400 opacity-60" />
             <span className="live-dot relative h-3 w-3 rounded-full bg-emerald-400" />
           </div>
           <div>
-            <h2 className="font-semibold text-white text-sm">רגע זה – 5 דקות אחרונות</h2>
-            <p className="text-[11px] text-slate-500">כמו GA4 Realtime · מתעדכן כל 30 שניות</p>
+            <h2 className="font-black text-white text-base">רגע זה</h2>
+            <p className="text-[11px] text-slate-600">5 דקות אחרונות · מתעדכן כל 30 שניות</p>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-center">
-          <div>
-            <p className="text-2xl font-bold text-emerald-400 tabular-nums">{activeUsers5min}</p>
-            <p className="text-[10px] text-slate-500">פעילים 5 דק׳</p>
+        {/* Activity Rings */}
+        <div className="flex items-end gap-5">
+          <div className="flex flex-col items-center gap-1">
+            <ActivityRing
+              value={activeUsers5min}
+              max={Math.max(activeUsers30min, activeUsers5min, 1)}
+              color="#34d399"
+              size={88}
+              label="5 דק׳"
+            />
           </div>
-          <div className="w-px h-8 bg-white/10" />
-          <div>
-            <p className="text-2xl font-bold text-teal-400 tabular-nums">{activeUsers30min}</p>
-            <p className="text-[10px] text-slate-500">פעילים 30 דק׳</p>
+          <div className="flex flex-col items-center gap-1">
+            <ActivityRing
+              value={activeUsers30min}
+              max={Math.max(activeUsers30min * 1.5, 1)}
+              color="#2dd4bf"
+              size={72}
+              label="30 דק׳"
+            />
           </div>
         </div>
       </div>
@@ -1051,12 +1110,9 @@ function LiveFeed({
         </div>
       ) : (
         <div className="mb-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {/* Active now – shows both 5-min and 30-min */}
-          <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] p-3 text-center flex flex-col justify-center min-h-[5rem]">
-            <p className="text-xl font-bold text-emerald-400"><AnimatedNumber value={live5min} /></p>
-            <p className="text-[10px] text-slate-500 leading-tight">5 דק׳</p>
-            <p className="text-sm font-semibold text-teal-400 mt-1"><AnimatedNumber value={activeNow} /></p>
-            <p className="text-[10px] text-slate-500 leading-tight">30 דק׳</p>
+          {/* Active now – rings for 5-min and 30-min */}
+          <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3 flex flex-col items-center justify-center gap-2 min-h-[5rem]">
+            <ActivityRing value={live5min} max={Math.max(activeNow, live5min, 1)} color="#34d399" size={64} strokeWidth={5} label="5 דק׳" />
           </div>
           {/* Top feature */}
           <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-3 text-center flex flex-col justify-center min-h-[5rem]">
@@ -1307,7 +1363,9 @@ export default function AdminDashboard() {
   const chartTitle = data?.chartType === 'hourly' ? 'פעילות לפי שעה' : 'כניסות לאפליקציה';
   const chartSub   = data?.chartType === 'hourly' ? 'שעות היממה' : rangeSubLabel(range);
 
-  const cityItems = (data?.cityData ?? []).map((c) => ({ id: c.city, label: hebrewCity(c.city), value: c.users }));
+  const cityItems = (data?.cityData ?? [])
+    .filter(c => c.city && c.city.trim() !== '' && c.city !== '(not set)' && c.city !== 'not set')
+    .map((c) => ({ id: c.city, label: hebrewCity(c.city), value: c.users }));
   const featureItems = (() => {
     const detail = data?.featureEventsDetail ?? [];
     if (detail.length > 0) {
@@ -1336,19 +1394,32 @@ export default function AdminDashboard() {
         }
         grouped.set(key, (grouped.get(key) ?? 0) + e.count);
       }
-      return Array.from(grouped.entries())
+      const raw = Array.from(grouped.entries())
         .sort((a, b) => b[1] - a[1])
         .map(([key, count]) => ({
           id: key,
           label: hebrewEvent(key),
           value: count,
         }));
+      // Merge items whose translated label is identical (e.g. "daily_challenge" and "challenge" → "האתגר היומי")
+      const byLabel = new Map<string, { id: string; label: string; value: number }>();
+      for (const item of raw) {
+        const ex = byLabel.get(item.label);
+        if (ex) ex.value += item.value; else byLabel.set(item.label, { ...item });
+      }
+      return Array.from(byLabel.values()).sort((a, b) => b.value - a.value);
     }
-    return (data?.featureEvents ?? []).map((e) => ({
+    const raw2 = (data?.featureEvents ?? []).map((e) => ({
       id: e.name,
       label: hebrewEvent(e.name),
       value: e.count,
     }));
+    const byLabel2 = new Map<string, { id: string; label: string; value: number }>();
+    for (const item of raw2) {
+      const ex = byLabel2.get(item.label);
+      if (ex) ex.value += item.value; else byLabel2.set(item.label, { ...item });
+    }
+    return Array.from(byLabel2.values()).sort((a, b) => b.value - a.value);
   })();
   const platformItems = (data?.platformData  ?? []).map((p) => ({ id: p.platform,label: p.platform,         value: p.users }));
   const screenItems   = (data?.screenData    ?? []).map((s) => ({ id: s.screen,  label: s.screen,           value: s.views }));
@@ -1366,13 +1437,13 @@ export default function AdminDashboard() {
     <main
       dir="rtl"
       className="relative min-h-screen overflow-x-hidden text-slate-100"
-      style={{ background: '#030711' }}
+      style={{ background: '#080608' }}
     >
-      {/* Deep space gradient blobs */}
+      {/* Atmosphere */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-        <div className="absolute -top-40 -right-40 h-[700px] w-[700px] rounded-full bg-blue-700/[0.10] blur-[160px]" />
-        <div className="absolute top-1/2 -left-40 h-[600px] w-[600px] rounded-full bg-violet-800/[0.08] blur-[140px]" />
-        <div className="absolute -bottom-20 right-1/4 h-[500px] w-[500px] rounded-full bg-cyan-700/[0.06] blur-[120px]" />
+        <div className="absolute -top-60 right-0 h-[800px] w-[800px] rounded-full bg-amber-500/[0.07] blur-[200px]" />
+        <div className="absolute top-1/3 -left-60 h-[700px] w-[700px] rounded-full bg-violet-700/[0.08] blur-[180px]" />
+        <div className="absolute -bottom-40 right-1/2 h-[600px] w-[600px] rounded-full bg-orange-600/[0.05] blur-[160px]" />
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
@@ -1384,22 +1455,20 @@ export default function AdminDashboard() {
           transition={{ duration: 0.6 }}
           className="mb-8"
         >
-          {/* Eyebrow bar */}
-          <div className="mb-5 flex items-center justify-between gap-4 flex-wrap">
+          {/* Top row: live badge + controls */}
+          <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 backdrop-blur-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                  Live Analytics
-                </span>
+              <div className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-1.5">
+                <span className="live-dot h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-500">Live</span>
               </div>
               {lastUpdated && (
-                <span className="text-[11px] text-slate-700 hidden sm:block">
-                  עודכן {lastUpdated.toLocaleTimeString('he-IL')}
+                <span className="text-[11px] text-slate-700 hidden sm:block font-mono">
+                  {lastUpdated.toLocaleTimeString('he-IL')}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
               <div className="relative">
                 <a
                   href="https://docs.google.com/spreadsheets/d/1DiNuIOnOhrMU1GVbPrCd5s2XcIRvPnvIpfiyQnouS28/edit?resourcekey=&gid=893573067#gid=893573067"
@@ -1409,20 +1478,19 @@ export default function AdminDashboard() {
                     localStorage.setItem('last_seen_count', sheetRowCount.toString());
                     setSheetsBadge(false);
                   }}
-                  className="flex items-center gap-2 rounded-xl border border-teal-400/25 bg-teal-400/[0.08] px-4 py-2 text-sm font-semibold text-teal-400 backdrop-blur-md transition-all hover:bg-teal-400/[0.14] hover:border-teal-400/40"
-                  style={{ boxShadow: '0 0 14px rgba(45,212,191,0.12)' }}
+                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-slate-400 backdrop-blur-md transition-all hover:bg-white/[0.10] hover:text-white"
                 >
                   <ExternalLink size={14} />
                   ערוץ
                 </a>
                 {sheetsBadge && (
-                  <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 border-2 border-slate-900 animate-pulse" />
+                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-black animate-pulse" />
                 )}
               </div>
               <button
                 onClick={fetchData}
                 disabled={loading}
-                className="flex items-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.05] px-4 py-2 text-sm font-medium text-slate-300 backdrop-blur-md transition-all hover:bg-white/[0.10] hover:text-white disabled:opacity-40"
+                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-slate-400 backdrop-blur-md transition-all hover:bg-amber-500/[0.12] hover:border-amber-500/30 hover:text-amber-400 disabled:opacity-40"
               >
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                 רענן
@@ -1430,39 +1498,41 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Title */}
-          <div>
-            <h1 className="text-5xl font-black tracking-tight text-white leading-none">
-              חובש<span
+          {/* Massive title */}
+          <div className="mb-5">
+            <h1 className="text-6xl sm:text-7xl font-black tracking-tighter leading-none">
+              <span className="text-white">חובש</span>
+              <span
                 style={{
-                  background: 'linear-gradient(135deg, #34d399 0%, #06b6d4 100%)',
+                  background: 'linear-gradient(125deg, #eab308 0%, #f97316 60%, #ef4444 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
+                  filter: 'drop-shadow(0 0 30px rgba(234,179,8,0.4))',
                 }}
               >+</span>
             </h1>
-            <p className="mt-2 text-xs text-slate-600 font-medium tracking-wide">לוח בקרה · GA4 Real-Time Analytics</p>
+            <p className="mt-1.5 text-[11px] font-bold uppercase tracking-[0.25em] text-slate-700">
+              GA4 · Real-Time Analytics Dashboard
+            </p>
           </div>
 
-          {/* Divider */}
-          <div className="mt-6 h-px bg-gradient-to-r from-white/[0.14] via-white/[0.05] to-transparent" />
+          {/* Gold accent divider */}
+          <div className="mb-4 h-px bg-gradient-to-r from-amber-500/40 via-amber-500/10 to-transparent" />
 
-          {/* Time Range Picker */}
-          <div className="mt-4 grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+          {/* Time Range Picker — pill container */}
+          <div className="flex items-stretch gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
             {RANGES.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setRange(key)}
-                className={`
-                  rounded-xl px-1 py-2 text-xs sm:text-sm font-semibold transition-all duration-200 text-center w-full whitespace-nowrap overflow-hidden text-ellipsis
+                className={`flex-1 rounded-xl py-2 text-xs font-bold transition-all duration-200 text-center whitespace-nowrap overflow-hidden text-ellipsis
                   ${range === key
-                    ? 'bg-white/[0.13] text-white border border-white/[0.18]'
-                    : 'border border-white/[0.06] bg-white/[0.02] text-slate-500 hover:bg-white/[0.07] hover:text-slate-300'
-                  }
-                `}
-                style={range === key ? { boxShadow: '0 2px 14px rgba(0,0,0,0.45)' } : undefined}
+                    ? 'bg-amber-500 text-black shadow-lg'
+                    : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.06]'
+                  }`}
+                style={range === key ? { boxShadow: '0 0 24px rgba(234,179,8,0.45)' } : undefined}
               >
-                {key === 'custom' && <CalendarDays size={13} className="inline mr-1 mb-0.5" />}
+                {key === 'custom' && <CalendarDays size={11} className="inline mr-0.5 mb-0.5" />}
                 {label}
               </button>
             ))}
@@ -1534,9 +1604,9 @@ export default function AdminDashboard() {
                 label="סה״כ היום"
                 rawValue={todayUsers}
                 sub="ממידנוח (שעון ישראל)"
-                accentBg="bg-indigo-500/20"
-                accentText="text-indigo-400"
-                neonColor="#818cf8"
+                accentBg="bg-amber-500/20"
+                accentText="text-amber-400"
+                neonColor="#eab308"
                 tooltip="משתמשים ייחודיים (לפי מזהה מכשיר) שהיו פעילים מאז 00:00 שעון ישראל. לעולם לא יהיה נמוך ממספר הפעילים ב-30 דקות."
               />
               <StatCard
@@ -1580,9 +1650,9 @@ export default function AdminDashboard() {
                 label="מכשירים חדשים"
                 rawValue={newUsers}
                 sub="first_open בטווח זה"
-                accentBg="bg-sky-500/20"
-                accentText="text-sky-400"
-                neonColor="#38bdf8"
+                accentBg="bg-orange-500/20"
+                accentText="text-orange-400"
+                neonColor="#fb923c"
                 pulseClass={newPulse}
                 tooltip="מכשירים שפתחו את האפליקציה לראשונה (אירוע first_open). מייצג התקנות חדשות בטווח הנבחר."
               />
@@ -1593,8 +1663,9 @@ export default function AdminDashboard() {
                 rawValue={data?.summaryStats.avgSessionDuration ?? 0}
                 rawFormat={formatDuration}
                 sub="דקות:שניות לסשן"
-                accentBg="bg-amber-500/20"
-                accentText="text-amber-400"
+                accentBg="bg-pink-500/20"
+                accentText="text-pink-400"
+                neonColor="#ec4899"
               />
               <StatCard
                 index={6}
@@ -1604,6 +1675,7 @@ export default function AdminDashboard() {
                 sub="מאז הפעלת האפליקציה"
                 accentBg="bg-rose-500/20"
                 accentText="text-rose-400"
+                neonColor="#f43f5e"
                 tooltip="סך כל המכשירים שהתקינו את האפליקציה מאז ינואר 2023 (אירוע newUsers מצטבר)."
               />
             </>
@@ -1626,13 +1698,12 @@ export default function AdminDashboard() {
           {/* Sessions/Users chart – 2/3 */}
           <GlassCard index={6} className="col-span-1 xl:col-span-2 p-6">
             <div className="mb-5 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-indigo-500/15 ring-1 ring-indigo-500/25 shrink-0">
-                <BarChart2 size={16} className="text-indigo-400" />
+              <div className="w-1 h-7 rounded-full bg-indigo-400 shrink-0" />
+              <div className="flex-1">
+                <h2 className="font-black text-white text-sm">{chartTitle}</h2>
+                <p className="text-[11px] text-slate-600">{chartSub}</p>
               </div>
-              <div>
-                <h2 className="font-bold text-white text-sm">{chartTitle}</h2>
-                <p className="text-[11px] text-slate-500">{chartSub}</p>
-              </div>
+              <BarChart2 size={15} className="text-indigo-400/60" />
             </div>
 
             {loading ? (
@@ -1681,16 +1752,15 @@ export default function AdminDashboard() {
           {/* Features TileGrid – 1/3 */}
           <GlassCard index={7} className="col-span-1 p-6 flex flex-col min-h-0">
             <div className="mb-5 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-amber-500/15 ring-1 ring-amber-500/25 shrink-0">
-                <Zap size={16} className="text-amber-400" />
-              </div>
+              <div className="w-1 h-7 rounded-full bg-amber-400 shrink-0" />
               <div className="flex-1 min-w-0">
-                <h2 className="font-bold text-white text-sm">פיצ&apos;רים בשימוש</h2>
+                <h2 className="font-black text-white text-sm">פיצ&apos;רים בשימוש</h2>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <p className="text-[11px] text-slate-500">סה&quot;כ פעולות (לא משתמשים ייחודיים)</p>
+                  <p className="text-[11px] text-slate-600">סה&quot;כ פעולות</p>
                   <InfoTooltip text="המספרים מייצגים סך הפעולות (eventCount) — לא משתמשים ייחודיים. משתמש שפתח פיצ׳ר 3 פעמים נספר 3." />
                 </div>
               </div>
+              <Zap size={15} className="text-amber-400/60" />
             </div>
             <TileGrid
               items={featureItems}
@@ -1708,13 +1778,12 @@ export default function AdminDashboard() {
           {/* Peak hours bar chart */}
           <GlassCard index={8} className="p-6">
             <div className="mb-5 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-violet-500/15 ring-1 ring-violet-500/25 shrink-0">
-                <Activity size={16} className="text-violet-400" />
+              <div className="w-1 h-7 rounded-full bg-violet-400 shrink-0" />
+              <div className="flex-1">
+                <h2 className="font-black text-white text-sm">שעות עומס</h2>
+                <p className="text-[11px] text-slate-600">פעילות לפי שעות היממה</p>
               </div>
-              <div>
-                <h2 className="font-bold text-white text-sm">שעות עומס</h2>
-                <p className="text-[11px] text-slate-500">פעילות לפי שעות היממה</p>
-              </div>
+              <Activity size={15} className="text-violet-400/60" />
             </div>
 
             {loading ? (
@@ -1744,13 +1813,12 @@ export default function AdminDashboard() {
           {/* Geographic cities TileGrid */}
           <GlassCard index={9} className="p-6 flex flex-col">
             <div className="mb-5 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-teal-500/15 ring-1 ring-teal-500/25 shrink-0">
-                <MapPin size={16} className="text-teal-400" />
+              <div className="w-1 h-7 rounded-full bg-teal-400 shrink-0" />
+              <div className="flex-1">
+                <h2 className="font-black text-white text-sm">ניתוח גאוגרפי</h2>
+                <p className="text-[11px] text-slate-600">ערים עם הכי הרבה משתמשים</p>
               </div>
-              <div>
-                <h2 className="font-bold text-white text-sm">ניתוח גאוגרפי</h2>
-                <p className="text-[11px] text-slate-500">ערים עם הכי הרבה משתמשים</p>
-              </div>
+              <MapPin size={15} className="text-teal-400/60" />
             </div>
             <TileGrid
               items={cityItems}
@@ -1768,13 +1836,12 @@ export default function AdminDashboard() {
 
           <GlassCard index={10} className="p-6 flex flex-col">
             <div className="mb-5 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-sky-500/15 ring-1 ring-sky-500/25 shrink-0">
-                <Smartphone size={16} className="text-sky-400" />
+              <div className="w-1 h-7 rounded-full bg-sky-400 shrink-0" />
+              <div className="flex-1">
+                <h2 className="font-black text-white text-sm">פלטפורמות</h2>
+                <p className="text-[11px] text-slate-600">פילוח לפי מערכת הפעלה</p>
               </div>
-              <div>
-                <h2 className="font-bold text-white text-sm">פלטפורמות</h2>
-                <p className="text-[11px] text-slate-500">פילוח לפי מערכת הפעלה</p>
-              </div>
+              <Smartphone size={15} className="text-sky-400/60" />
             </div>
             <RankedList
               items={platformItems}
@@ -1787,13 +1854,12 @@ export default function AdminDashboard() {
 
           <GlassCard index={11} className="p-6 flex flex-col">
             <div className="mb-5 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-pink-500/15 ring-1 ring-pink-500/25 shrink-0">
-                <Monitor size={16} className="text-pink-400" />
+              <div className="w-1 h-7 rounded-full bg-pink-400 shrink-0" />
+              <div className="flex-1">
+                <h2 className="font-black text-white text-sm">מסכים פופולריים</h2>
+                <p className="text-[11px] text-slate-600">הדפים עם הכי הרבה צפיות</p>
               </div>
-              <div>
-                <h2 className="font-bold text-white text-sm">מסכים פופולריים</h2>
-                <p className="text-[11px] text-slate-500">הדפים עם הכי הרבה צפיות</p>
-              </div>
+              <Monitor size={15} className="text-pink-400/60" />
             </div>
             <RankedList
               items={screenItems}
