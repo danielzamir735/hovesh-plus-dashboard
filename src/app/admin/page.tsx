@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence, animate } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
   Activity,
@@ -441,6 +441,14 @@ const WORD_HEB: Record<string, string> = {
   kit:'ציוד', standard:'תקן', tool:'כלי', vitals:'מדדים',
 };
 
+// Action verbs that should never be treated as feature names in featureItems grouping
+const ACTION_ONLY_WORDS = new Set([
+  'opened', 'closed', 'open', 'close', 'start', 'started', 'end', 'ended',
+  'complete', 'completed', 'view', 'viewed', 'click', 'clicked', 'tap', 'tapped',
+  'select', 'selected', 'use', 'used', 'show', 'shown', 'hide', 'hidden',
+  'begin', 'began', 'stop', 'stopped', 'pause', 'paused', 'resume', 'resumed',
+]);
+
 function hebrewCity(name: string) { return CITY_LABELS[name] ?? name; }
 
 function hebrewEvent(name: string): string {
@@ -522,29 +530,7 @@ function AnimatedNumber({
   value: number;
   format?: (n: number) => string;
 }) {
-  const [display, setDisplay] = useState(0);
-  const [rev, setRev] = useState(0);
-
-  useEffect(() => {
-    setRev((r) => r + 1);
-    const ctrl = animate(0, value, {
-      duration: 1.4,
-      ease: 'easeOut',
-      onUpdate: (v) => setDisplay(Math.round(v)),
-    });
-    return () => ctrl.stop();
-  }, [value]);
-
-  return (
-    <motion.span
-      key={rev}
-      className="tabular-nums inline-block"
-      animate={{ scale: [1, 1.06, 1] }}
-      transition={{ duration: 0.45, times: [0, 0.28, 1], ease: 'easeOut' }}
-    >
-      {fmt(display)}
-    </motion.span>
-  );
+  return <span className="tabular-nums">{fmt(value)}</span>;
 }
 
 // ─── GlassCard ────────────────────────────────────────────────────────────────
@@ -566,14 +552,14 @@ function GlassCard({
 }) {
   const baseStyle: React.CSSProperties = neonColor
     ? {
-        borderColor: neonColor + '28',
-        boxShadow: `0 0 28px ${neonColor}14, inset 0 1px 0 rgba(255,255,255,0.06)`,
+        borderColor: neonColor + '22',
+        boxShadow: `0 0 40px ${neonColor}10, 0 8px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.09)`,
         '--neon': neonColor,
         ...extStyle,
       } as React.CSSProperties
     : {
-        borderColor: 'rgba(255,255,255,0.07)',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.09)',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)',
         ...extStyle,
       };
 
@@ -583,7 +569,7 @@ function GlassCard({
       variants={fadeUp}
       initial="hidden"
       animate="visible"
-      className={`relative rounded-2xl border bg-white/[0.04] backdrop-blur-2xl ${pulseClass ?? ''} ${className}`}
+      className={`relative rounded-2xl border bg-gradient-to-br from-white/[0.06] via-white/[0.03] to-transparent backdrop-blur-2xl ${pulseClass ?? ''} ${className}`}
       style={baseStyle}
     >
       {children}
@@ -620,30 +606,40 @@ function StatCard({
   pulseClass?: string;
   tooltip?: string;
 }) {
+  const displayValue = rawValue !== undefined
+    ? (rawFormat ? rawFormat(rawValue) : formatNumber(rawValue))
+    : (staticValue ?? '—');
+
   return (
     <GlassCard
       index={index}
-      className="p-5 flex flex-col gap-3 hover:bg-white/[0.07] transition-colors duration-300"
+      className="p-5 flex flex-col gap-2 hover:bg-white/[0.03] transition-colors duration-300 overflow-hidden"
       neonColor={neonColor}
       pulseClass={pulseClass}
     >
-      <div className="flex items-center justify-between gap-2">
+      {neonColor && (
+        <div
+          className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full blur-3xl pointer-events-none"
+          style={{ background: neonColor, opacity: 0.07 }}
+        />
+      )}
+      <div className="flex items-start justify-between gap-2 relative z-10">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-xs font-medium text-slate-400 leading-tight truncate">{label}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 leading-tight truncate">
+            {label}
+          </span>
           {tooltip && <InfoTooltip text={tooltip} />}
         </div>
-        <div className={`p-2 rounded-xl ${accentBg} shrink-0`}>
-          <Icon size={15} className={accentText} />
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${accentBg} ring-1 ring-white/10 shrink-0`}>
+          <Icon size={13} className={accentText} />
         </div>
       </div>
-      <p className="text-2xl sm:text-3xl font-bold tracking-tight text-white truncate">
-        {rawValue !== undefined ? (
-          <AnimatedNumber value={rawValue} format={rawFormat} />
-        ) : (
-          staticValue ?? '—'
-        )}
+      <p className="text-3xl sm:text-4xl font-black tracking-tight text-white relative z-10 leading-none mt-1">
+        {displayValue}
       </p>
-      {sub && <p className="text-xs text-slate-500 leading-tight">{sub}</p>}
+      {sub && (
+        <p className="text-[11px] text-slate-600 relative z-10 mt-auto">{sub}</p>
+      )}
     </GlassCard>
   );
 }
@@ -1317,7 +1313,27 @@ export default function AdminDashboard() {
     if (detail.length > 0) {
       const grouped = new Map<string, number>();
       for (const e of detail) {
-        const key = e.featureName && e.featureName !== '(not set)' ? e.featureName : e.eventName;
+        let key: string;
+        if (e.featureName && e.featureName !== '(not set)') {
+          const fn = e.featureName.toLowerCase();
+          if (ACTION_ONLY_WORDS.has(fn)) {
+            // featureName is just a verb (e.g. "opened", "closed") — use eventName instead
+            key = e.eventName;
+          } else {
+            // Strip trailing action word: "daily_challenge_opened" → "daily_challenge"
+            const parts = fn.split('_');
+            if (parts.length >= 2 && ACTION_ONLY_WORDS.has(parts[parts.length - 1])) {
+              const base = e.featureName.slice(0, e.featureName.lastIndexOf('_'));
+              key = (FEATURE_NAME_LABELS[base] ?? FEATURE_NAME_LABELS[base.toLowerCase()])
+                ? base
+                : e.featureName;
+            } else {
+              key = e.featureName;
+            }
+          }
+        } else {
+          key = e.eventName;
+        }
         grouped.set(key, (grouped.get(key) ?? 0) + e.count);
       }
       return Array.from(grouped.entries())
@@ -1350,13 +1366,13 @@ export default function AdminDashboard() {
     <main
       dir="rtl"
       className="relative min-h-screen overflow-x-hidden text-slate-100"
-      style={{ background: '#020617' }}
+      style={{ background: '#030711' }}
     >
       {/* Deep space gradient blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-        <div className="absolute -top-60 -right-60 h-[700px] w-[700px] rounded-full bg-teal-500/[0.07] blur-[140px]" />
-        <div className="absolute top-1/3 -left-40 h-[600px] w-[600px] rounded-full bg-indigo-500/[0.07] blur-[140px]" />
-        <div className="absolute bottom-0 right-1/3 h-[500px] w-[500px] rounded-full bg-violet-500/[0.05] blur-[120px]" />
+        <div className="absolute -top-40 -right-40 h-[700px] w-[700px] rounded-full bg-blue-700/[0.10] blur-[160px]" />
+        <div className="absolute top-1/2 -left-40 h-[600px] w-[600px] rounded-full bg-violet-800/[0.08] blur-[140px]" />
+        <div className="absolute -bottom-20 right-1/4 h-[500px] w-[500px] rounded-full bg-cyan-700/[0.06] blur-[120px]" />
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
@@ -1368,23 +1384,22 @@ export default function AdminDashboard() {
           transition={{ duration: 0.6 }}
           className="mb-8"
         >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-white">
-                חובש<span
-                  className="text-teal-400"
-                  style={{ textShadow: '0 0 20px rgba(45,212,191,0.6)' }}
-                >+</span>
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">לוח בקרה · GA4 Real-Time Analytics</p>
-            </div>
-
-            <div className="flex items-center gap-3 flex-wrap">
+          {/* Eyebrow bar */}
+          <div className="mb-5 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 backdrop-blur-sm">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                  Live Analytics
+                </span>
+              </div>
               {lastUpdated && (
-                <span className="text-xs text-slate-600 hidden sm:block">
-                  {lastUpdated.toLocaleTimeString('he-IL')}
+                <span className="text-[11px] text-slate-700 hidden sm:block">
+                  עודכן {lastUpdated.toLocaleTimeString('he-IL')}
                 </span>
               )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="relative">
                 <a
                   href="https://docs.google.com/spreadsheets/d/1DiNuIOnOhrMU1GVbPrCd5s2XcIRvPnvIpfiyQnouS28/edit?resourcekey=&gid=893573067#gid=893573067"
@@ -1407,7 +1422,7 @@ export default function AdminDashboard() {
               <button
                 onClick={fetchData}
                 disabled={loading}
-                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-slate-300 backdrop-blur-md transition-all hover:bg-white/[0.09] hover:text-white disabled:opacity-40"
+                className="flex items-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.05] px-4 py-2 text-sm font-medium text-slate-300 backdrop-blur-md transition-all hover:bg-white/[0.10] hover:text-white disabled:opacity-40"
               >
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                 רענן
@@ -1415,8 +1430,25 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* Title */}
+          <div>
+            <h1 className="text-5xl font-black tracking-tight text-white leading-none">
+              חובש<span
+                style={{
+                  background: 'linear-gradient(135deg, #34d399 0%, #06b6d4 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >+</span>
+            </h1>
+            <p className="mt-2 text-xs text-slate-600 font-medium tracking-wide">לוח בקרה · GA4 Real-Time Analytics</p>
+          </div>
+
+          {/* Divider */}
+          <div className="mt-6 h-px bg-gradient-to-r from-white/[0.14] via-white/[0.05] to-transparent" />
+
           {/* Time Range Picker */}
-          <div className="mt-5 grid grid-cols-4 sm:grid-cols-7 gap-2">
+          <div className="mt-4 grid grid-cols-4 sm:grid-cols-7 gap-1.5">
             {RANGES.map(({ key, label }) => (
               <button
                 key={key}
@@ -1424,11 +1456,11 @@ export default function AdminDashboard() {
                 className={`
                   rounded-xl px-1 py-2 text-xs sm:text-sm font-semibold transition-all duration-200 text-center w-full whitespace-nowrap overflow-hidden text-ellipsis
                   ${range === key
-                    ? 'bg-teal-500/80 text-white border border-teal-400/50'
-                    : 'border border-white/[0.08] bg-white/[0.04] text-slate-400 hover:bg-white/[0.08] hover:text-slate-200'
+                    ? 'bg-white/[0.13] text-white border border-white/[0.18]'
+                    : 'border border-white/[0.06] bg-white/[0.02] text-slate-500 hover:bg-white/[0.07] hover:text-slate-300'
                   }
                 `}
-                style={range === key ? { boxShadow: '0 0 18px rgba(45,212,191,0.28)' } : undefined}
+                style={range === key ? { boxShadow: '0 2px 14px rgba(0,0,0,0.45)' } : undefined}
               >
                 {key === 'custom' && <CalendarDays size={13} className="inline mr-1 mb-0.5" />}
                 {label}
@@ -1594,12 +1626,12 @@ export default function AdminDashboard() {
           {/* Sessions/Users chart – 2/3 */}
           <GlassCard index={6} className="col-span-1 xl:col-span-2 p-6">
             <div className="mb-5 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-indigo-500/15">
-                <BarChart2 size={17} className="text-indigo-400" />
+              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-indigo-500/15 ring-1 ring-indigo-500/25 shrink-0">
+                <BarChart2 size={16} className="text-indigo-400" />
               </div>
               <div>
-                <h2 className="font-semibold text-white">{chartTitle}</h2>
-                <p className="text-xs text-slate-500">{chartSub}</p>
+                <h2 className="font-bold text-white text-sm">{chartTitle}</h2>
+                <p className="text-[11px] text-slate-500">{chartSub}</p>
               </div>
             </div>
 
@@ -1649,13 +1681,13 @@ export default function AdminDashboard() {
           {/* Features TileGrid – 1/3 */}
           <GlassCard index={7} className="col-span-1 p-6 flex flex-col min-h-0">
             <div className="mb-5 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-amber-500/15">
-                <Zap size={17} className="text-amber-400" />
+              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-amber-500/15 ring-1 ring-amber-500/25 shrink-0">
+                <Zap size={16} className="text-amber-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-white">פיצ&apos;רים בשימוש</h2>
+                <h2 className="font-bold text-white text-sm">פיצ&apos;רים בשימוש</h2>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <p className="text-xs text-slate-500">סה&quot;כ פעולות (לא משתמשים ייחודיים)</p>
+                  <p className="text-[11px] text-slate-500">סה&quot;כ פעולות (לא משתמשים ייחודיים)</p>
                   <InfoTooltip text="המספרים מייצגים סך הפעולות (eventCount) — לא משתמשים ייחודיים. משתמש שפתח פיצ׳ר 3 פעמים נספר 3." />
                 </div>
               </div>
@@ -1676,12 +1708,12 @@ export default function AdminDashboard() {
           {/* Peak hours bar chart */}
           <GlassCard index={8} className="p-6">
             <div className="mb-5 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-violet-500/15">
-                <Activity size={17} className="text-violet-400" />
+              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-violet-500/15 ring-1 ring-violet-500/25 shrink-0">
+                <Activity size={16} className="text-violet-400" />
               </div>
               <div>
-                <h2 className="font-semibold text-white">שעות עומס</h2>
-                <p className="text-xs text-slate-500">פעילות לפי שעות היממה</p>
+                <h2 className="font-bold text-white text-sm">שעות עומס</h2>
+                <p className="text-[11px] text-slate-500">פעילות לפי שעות היממה</p>
               </div>
             </div>
 
@@ -1712,12 +1744,12 @@ export default function AdminDashboard() {
           {/* Geographic cities TileGrid */}
           <GlassCard index={9} className="p-6 flex flex-col">
             <div className="mb-5 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-teal-500/15">
-                <MapPin size={17} className="text-teal-400" />
+              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-teal-500/15 ring-1 ring-teal-500/25 shrink-0">
+                <MapPin size={16} className="text-teal-400" />
               </div>
               <div>
-                <h2 className="font-semibold text-white">ניתוח גאוגרפי</h2>
-                <p className="text-xs text-slate-500">ערים עם הכי הרבה משתמשים</p>
+                <h2 className="font-bold text-white text-sm">ניתוח גאוגרפי</h2>
+                <p className="text-[11px] text-slate-500">ערים עם הכי הרבה משתמשים</p>
               </div>
             </div>
             <TileGrid
@@ -1736,12 +1768,12 @@ export default function AdminDashboard() {
 
           <GlassCard index={10} className="p-6 flex flex-col">
             <div className="mb-5 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-sky-500/15">
-                <Smartphone size={17} className="text-sky-400" />
+              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-sky-500/15 ring-1 ring-sky-500/25 shrink-0">
+                <Smartphone size={16} className="text-sky-400" />
               </div>
               <div>
-                <h2 className="font-semibold text-white">פלטפורמות</h2>
-                <p className="text-xs text-slate-500">פילוח לפי מערכת הפעלה</p>
+                <h2 className="font-bold text-white text-sm">פלטפורמות</h2>
+                <p className="text-[11px] text-slate-500">פילוח לפי מערכת הפעלה</p>
               </div>
             </div>
             <RankedList
@@ -1755,12 +1787,12 @@ export default function AdminDashboard() {
 
           <GlassCard index={11} className="p-6 flex flex-col">
             <div className="mb-5 flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-pink-500/15">
-                <Monitor size={17} className="text-pink-400" />
+              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-pink-500/15 ring-1 ring-pink-500/25 shrink-0">
+                <Monitor size={16} className="text-pink-400" />
               </div>
               <div>
-                <h2 className="font-semibold text-white">מסכים פופולריים</h2>
-                <p className="text-xs text-slate-500">הדפים עם הכי הרבה צפיות</p>
+                <h2 className="font-bold text-white text-sm">מסכים פופולריים</h2>
+                <p className="text-[11px] text-slate-500">הדפים עם הכי הרבה צפיות</p>
               </div>
             </div>
             <RankedList
